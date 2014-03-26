@@ -1,0 +1,7 @@
+((egg "level.egg")
+ (synopsis "Bindings to leveldb")
+ (category db)
+ (doc-from-wiki)
+ (license "BSD")
+ (author "Caolan McMahon")
+ (files "level.meta" "level.setup" "level.scm"))
