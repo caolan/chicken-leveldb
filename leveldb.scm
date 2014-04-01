@@ -1,26 +1,33 @@
-(module leveldb (test)
+(module leveldb
+        (leveldb-open leveldb-put leveldb-get)
 
 (import scheme chicken foreign)
+(use coops)
 
 (foreign-declare "#include <iostream>")
 (foreign-declare "#include \"leveldb/db.h\"")
 
-(define test
-  (foreign-lambda* int ()
+(define-class <db> ()
+              ((this '())))
+
+(define leveldb-open
+  (foreign-lambda* (instance "leveldb::DB" <db>) ((c-string loc))
                  "leveldb::DB* db;
                   leveldb::Options options;
                   leveldb::Status status;
-
                   options.create_if_missing = true;
+                  status = leveldb::DB::Open(options, loc, &db);
+                  C_return(db);"))
 
-                  status = leveldb::DB::Open(options, \"./testdb\", &db);
-
-                  std::string key = \"abc\";
-                  std::string value = \"123\";
-                  std::string ret;
-                  std::cout << value;
+(define leveldb-put
+  (foreign-lambda* int (((instance "leveldb::DB" <db>) db) (c-string key) (c-string value))
+                 "leveldb::Status status;
                   status = db->Put(leveldb::WriteOptions(), key, value);
-                  status = db->Get(leveldb::ReadOptions(), key, &ret);
-                  std::cout << ret;
+                  C_return(0);"))
 
-                  C_return(0);")))
+(define leveldb-get
+  (foreign-lambda* c-string (((instance "leveldb::DB" <db>) db) (c-string key))
+                 "leveldb::Status status;
+                  std::string ret;
+                  status = db->Get(leveldb::ReadOptions(), key, &ret);
+                  C_return(ret.c_str());"))
