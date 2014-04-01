@@ -30,4 +30,4 @@
                  "leveldb::Status status;
                   std::string ret;
                   status = db->Get(leveldb::ReadOptions(), key, &ret);
-                  C_return(ret.c_str());"))
+                  C_return(ret.c_str());")))
