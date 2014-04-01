@@ -1,2 +1,2 @@
-(use level)
+(use leveldb)
 (test)

@@ -1,0 +1,12 @@
+;(compile -s "leveldb.scm" -Iinclude -lleveldb -c++)
+
+(compile -O2 -d1 -s "leveldb.scm" -Iinclude -lleveldb -j "leveldb" -c++)
+(compile -O2 -d0 -s "leveldb.import.scm")
+(compile -O2 -d1 -c "leveldb.scm" -Iinclude -unit "leveldb" -o "leveldb-static.o" -c++)
+
+(install-extension
+  'leveldb
+  '("leveldb.so" "leveldb.import.so" "leveldb-static.o")
+  '((version "3.5.3")
+    (static "leveldb-static.o")
+    (documentation "leveldb.html" "egg.jpg")))

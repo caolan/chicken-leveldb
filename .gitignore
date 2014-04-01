@@ -1,0 +1,7 @@
+/*.o
+/*.so
+/leveldb-static.cpp
+/leveldb.cpp
+/leveldb.import.c
+/leveldb.import.scm
+/testdb

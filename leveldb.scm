@@ -1,4 +1,4 @@
-(module level (test)
+(module leveldb (test)
 
 (import scheme chicken foreign)
 
