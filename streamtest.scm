@@ -1,3 +1,5 @@
+;; see: http://wiki.call-cc.org/eggref/4/srfi-41
+
 (use streams)
 
 (define (factorial n)
