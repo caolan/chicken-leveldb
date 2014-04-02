@@ -10,6 +10,7 @@
 (define-class <db> ()
               ((this '())))
 
+
 (define leveldb-open
   (foreign-lambda* (instance "leveldb::DB" <db>) ((c-string loc))
                  "leveldb::DB* db;
@@ -19,15 +20,24 @@
                   status = leveldb::DB::Open(options, loc, &db);
                   C_return(db);"))
 
-(define leveldb-put
-  (foreign-lambda* int (((instance "leveldb::DB" <db>) db) (c-string key) (c-string value))
+(define c-leveldb-put
+  (foreign-lambda* int (((instance "leveldb::DB" <db>) db) (scheme-pointer keydata) (integer keysize) (scheme-pointer valuedata) (integer valuesize))
                  "leveldb::Status status;
+                  std::string key = std::string((const char*)keydata, keysize);
+                  std::string value = std::string((const char*)valuedata, valuesize);
                   status = db->Put(leveldb::WriteOptions(), key, value);
                   C_return(0);"))
 
-(define leveldb-get
-  (foreign-lambda* c-string (((instance "leveldb::DB" <db>) db) (c-string key))
+(define (leveldb-put db key value)
+  (c-leveldb-put db key (string-length key) value (string-length value)))
+
+(define c-leveldb-get
+  (foreign-lambda* c-string (((instance "leveldb::DB" <db>) db) (scheme-pointer keydata) (integer keysize))
                  "leveldb::Status status;
                   std::string ret;
+                  std::string key = std::string((const char*)keydata, keysize);
                   status = db->Get(leveldb::ReadOptions(), key, &ret);
-                  C_return(ret.c_str());")))
+                  C_return(ret.c_str());"))
+
+(define (leveldb-get db key)
+  (c-leveldb-get db key (string-length key))))
