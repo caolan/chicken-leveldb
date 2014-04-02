@@ -1,4 +1,5 @@
 ;; see: http://wiki.call-cc.org/eggref/4/srfi-41
+;; or, even better: http://wiki.call-cc.org/eggref/4/lazy-seq
 
 (use streams)
 
