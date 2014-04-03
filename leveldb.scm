@@ -42,17 +42,19 @@
      (integer keysize)
      ((c-pointer int) retsize))
     "leveldb::Status status;
-     std::string ret;
+     std::string *ret = new std::string();
      std::string key = std::string((const char*)keydata, keysize);
-     status = db->Get(leveldb::ReadOptions(), key, &ret);
-     *retsize = ret.size();
-     C_return(ret.data());"))
+     status = db->Get(leveldb::ReadOptions(), key, ret);
+     *retsize = ret->size();
+     C_return(ret->data());"))
 
 (define (leveldb-get db key)
   (let-location ([retsize int])
     (let* ([keylen (string-length key)]
            [retdata (c-leveldb-get db key keylen (location retsize))]
            [result (make-string retsize)])
+      (gc #t)
       (move-memory! retdata result retsize)
+      (gc #t)
       ;(free retdata)
       result))))
