@@ -1,5 +1,8 @@
 (use leveldb)
 
 (define db (leveldb-open "./testdb"))
-(leveldb-put db "foo" "bar")
-(write (leveldb-get db "foo"))
+(define key (list->string '(#\f #\o #\o #\nul)))
+(define val (list->string '(#\b #\a #\r #\nul)))
+
+(leveldb-put db key val)
+(write (leveldb-get db key))
