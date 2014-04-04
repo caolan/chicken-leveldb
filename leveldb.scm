@@ -44,18 +44,26 @@
 
 (define make-stdstr
   (foreign-lambda* stdstr ()
-     "std::string *x = new std::string();
-      C_return(x);"))
+    "std::string *x = new std::string();
+     C_return(x);"))
 
 
 (define-class <status> () ((this '())))
 (define-foreign-type status (instance "leveldb::Status" <status>))
+
+(define make-status
+  (foreign-lambda* status ()
+    "leveldb::Status *s = new leveldb::Status();
+     C_return(s);"))
 
 (define status-ok?
   (foreign-lambda* bool ((status s)) "C_return(s->ok());"))
 
 (define status-message
   (foreign-lambda* c-string ((status s)) "C_return(s->ToString().c_str());"))
+
+(define status-delete
+  (foreign-lambda* void ((status s)) "delete s;"))
 
 
 (define leveldb-open
@@ -77,21 +85,24 @@
   (c-leveldb-put db (string->stdstr key) (string->stdstr value)))
 
 (define c-leveldb-get
-  (foreign-lambda* status ((DB db) (stdstr key) (stdstr ret))
-    "leveldb::Status status;
-     status = db->Get(leveldb::ReadOptions(), *key, ret);
-     C_return(&status);"))
+  (foreign-lambda* int ((DB db) (stdstr key) (stdstr ret) (status s))
+    "*s = db->Get(leveldb::ReadOptions(), *key, ret);
+     C_return(0);"))
+
+(define (check-status s)
+  (if (status-ok? s)
+    (begin (status-delete s) #t)
+    (let ([msg (status-message s)])
+      (status-delete s)
+      (abort msg))))
 
 (define (leveldb-get db key)
   (let* ([keystr (string->stdstr key)]
          [ret (make-stdstr)]
-         [status (c-leveldb-get db keystr ret)]
+         [status (make-status)]
+         [void (c-leveldb-get db keystr ret status)]
          [result (stdstr->string ret)])
-    (write (status-ok? status))
-    ;; this causes a segfault when writing out status-message
-    ;(if (status-ok? status)
-    ;    (write "ok!")
-    ;    (write (stdstr->string (status-message status))))
     (stdstr-delete keystr)
     (stdstr-delete ret)
+    (check-status status)
     result)))
