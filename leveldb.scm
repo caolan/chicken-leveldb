@@ -42,6 +42,11 @@
     (move-memory! data result size)
     result))
 
+(define make-stdstr
+  (foreign-lambda* stdstr ()
+     "std::string *x = new std::string();
+      C_return(x);"))
+
 
 (define-class <status> () ((this '())))
 (define-foreign-type status (instance "leveldb::Status" <status>))
@@ -49,8 +54,8 @@
 (define status-ok?
   (foreign-lambda* bool ((status s)) "C_return(s->ok());"))
 
-;(define status-message
-;  (foreign-lambda* stdstr ((status s)) "C_return(s->ToString());"))
+(define status-message
+  (foreign-lambda* c-string ((status s)) "C_return(s->ToString().c_str());"))
 
 
 (define leveldb-open
@@ -72,16 +77,21 @@
   (c-leveldb-put db (string->stdstr key) (string->stdstr value)))
 
 (define c-leveldb-get
-  (foreign-lambda* stdstr ((DB db) (stdstr key))
+  (foreign-lambda* status ((DB db) (stdstr key) (stdstr ret))
     "leveldb::Status status;
-     std::string *ret = new std::string();
      status = db->Get(leveldb::ReadOptions(), *key, ret);
-     C_return(ret);"))
+     C_return(&status);"))
 
 (define (leveldb-get db key)
   (let* ([keystr (string->stdstr key)]
-         [ret (c-leveldb-get db keystr)]
+         [ret (make-stdstr)]
+         [status (c-leveldb-get db keystr ret)]
          [result (stdstr->string ret)])
+    (write (status-ok? status))
+    ;; this causes a segfault when writing out status-message
+    ;(if (status-ok? status)
+    ;    (write "ok!")
+    ;    (write (stdstr->string (status-message status))))
     (stdstr-delete keystr)
     (stdstr-delete ret)
     result)))
