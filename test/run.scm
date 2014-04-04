@@ -13,4 +13,6 @@
     (leveldb-put db key val)
     (test "null bytes in keys and values" val (leveldb-get db key)))
 
+(test-error "attempt to get missing key" (leveldb-get db "asdf"))
+
 (test-exit)
