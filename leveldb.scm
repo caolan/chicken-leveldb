@@ -11,17 +11,47 @@
 (define-class <db> () ((this '())))
 (define-foreign-type DB (instance "leveldb::DB" <db>))
 
-(define-class <std-string> () ((this '())))
-(define-foreign-type std-string (instance "std::string" <std-string>))
 
+(define-class <stdstr> () ((this '())))
+(define-foreign-type stdstr (instance "std::string" <stdstr>))
 
-(define str-data
-  (foreign-lambda* (c-pointer unsigned-char) ((std-string str))
+(define stdstr-data
+  (foreign-lambda* (c-pointer unsigned-char) ((stdstr str))
     "C_return(str->data());"))
 
-(define str-size
-  (foreign-lambda* integer ((std-string  str))
+(define stdstr-size
+  (foreign-lambda* integer ((stdstr  str))
     "C_return(str->size());"))
+
+(define stdstr-delete
+  (foreign-lambda* void ((stdstr ret)) "delete ret;"))
+
+(define (string->stdstr str)
+  ((foreign-lambda*
+     stdstr
+     ((integer size) (scheme-pointer data))
+     "std::string *x = new std::string((const char*)data, size);
+      C_return(x);")
+   (string-length str)
+   str))
+
+(define (stdstr->string str)
+  (let* ([size (stdstr-size str)]
+         [data (stdstr-data str)]
+         [result (make-string size)])
+    (move-memory! data result size)
+    result))
+
+
+(define-class <status> () ((this '())))
+(define-foreign-type status (instance "leveldb::Status" <status>))
+
+(define status-ok?
+  (foreign-lambda* bool ((status s)) "C_return(s->ok());"))
+
+;(define status-message
+;  (foreign-lambda* stdstr ((status s)) "C_return(s->ToString());"))
+
 
 (define leveldb-open
   (foreign-lambda* DB ((c-string loc))
@@ -33,39 +63,25 @@
      C_return(db);"))
 
 (define c-leveldb-put
-  (foreign-lambda* int
-    ((DB db)
-     (scheme-pointer keydata)
-     (integer keysize)
-     (scheme-pointer valuedata)
-     (integer valuesize))
+  (foreign-lambda* int ((DB db) (stdstr key) (stdstr value))
     "leveldb::Status status;
-     std::string key = std::string((const char*)keydata, keysize);
-     std::string value = std::string((const char*)valuedata, valuesize);
-     status = db->Put(leveldb::WriteOptions(), key, value);
+     status = db->Put(leveldb::WriteOptions(), *key, *value);
      C_return(0);"))
 
 (define (leveldb-put db key value)
-  (c-leveldb-put db key (string-length key) value (string-length value)))
+  (c-leveldb-put db (string->stdstr key) (string->stdstr value)))
 
 (define c-leveldb-get
-  (foreign-lambda* std-string
-    ((DB db) (scheme-pointer keydata) (integer keysize))
+  (foreign-lambda* stdstr ((DB db) (stdstr key))
     "leveldb::Status status;
      std::string *ret = new std::string();
-     std::string key = std::string((const char*)keydata, keysize);
-     status = db->Get(leveldb::ReadOptions(), key, ret);
+     status = db->Get(leveldb::ReadOptions(), *key, ret);
      C_return(ret);"))
 
-(define c-delete-ret
-  (foreign-lambda* void ((std-string ret)) "delete ret;"))
-
 (define (leveldb-get db key)
-  (let* ([keylen (string-length key)]
-         [ret (c-leveldb-get db key keylen)]
-         [retsize (str-size ret)]
-         [retdata (str-data ret)]
-         [result (make-string retsize)])
-    (move-memory! retdata result retsize)
-    (c-delete-ret ret)
+  (let* ([keystr (string->stdstr key)]
+         [ret (c-leveldb-get db keystr)]
+         [result (stdstr->string ret)])
+    (stdstr-delete keystr)
+    (stdstr-delete ret)
     result)))
