@@ -1,5 +1,5 @@
 (module leveldb
-  (leveldb-open leveldb-put leveldb-get)
+  (leveldb-open leveldb-close leveldb-put leveldb-get)
 
 (import scheme chicken foreign)
 (use coops lolevel)
@@ -75,19 +75,25 @@
      status = leveldb::DB::Open(options, loc, &db);
      C_return(db);"))
 
+(define leveldb-close
+  (foreign-lambda* void ((DB db)) "delete db;"))
+
 (define c-leveldb-put
-  (foreign-lambda* int ((DB db) (stdstr key) (stdstr value))
-    "leveldb::Status status;
-     status = db->Put(leveldb::WriteOptions(), *key, *value);
-     C_return(0);"))
+  (foreign-lambda* void ((DB db) (stdstr key) (stdstr value) (status s))
+    "*s = db->Put(leveldb::WriteOptions(), *key, *value);"))
 
 (define (leveldb-put db key value)
-  (c-leveldb-put db (string->stdstr key) (string->stdstr value)))
+  (let ([keystr (string->stdstr key)]
+        [valstr (string->stdstr value)]
+        [status (make-status)])
+    (c-leveldb-put db keystr valstr status)
+    (stdstr-delete keystr)
+    (stdstr-delete valstr)
+    (check-status status)))
 
 (define c-leveldb-get
-  (foreign-lambda* int ((DB db) (stdstr key) (stdstr ret) (status s))
-    "*s = db->Get(leveldb::ReadOptions(), *key, ret);
-     C_return(0);"))
+  (foreign-lambda* void ((DB db) (stdstr key) (stdstr ret) (status s))
+    "*s = db->Get(leveldb::ReadOptions(), *key, ret);"))
 
 (define (check-status s)
   (if (status-ok? s)

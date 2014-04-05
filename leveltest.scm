@@ -6,3 +6,4 @@
 
 (leveldb-put db key val)
 (write (leveldb-get db key))
+(leveldb-close db)
