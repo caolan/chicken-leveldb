@@ -51,6 +51,39 @@
     "std::string *x = new std::string();
      C_return(x);"))
 
+(define-class <slice> () ((this '())))
+(define-foreign-type slice (instance "leveldb::Slice" <slice>))
+
+(define slice-data
+  (foreign-lambda* (c-pointer unsigned-char) ((slice s))
+    "C_return(s->data());"))
+
+(define slice-size
+  (foreign-lambda* integer ((slice s))
+    "C_return(s->size());"))
+
+(define slice-delete
+  (foreign-lambda* void ((slice s)) "delete s;"))
+
+(define (string->slice str)
+  ((foreign-lambda* slice ((integer size) (scheme-pointer data))
+     "leveldb::Slice *x = new leveldb::Slice((const char*)data, size);
+      C_return(x);")
+   (string-length str)
+   str))
+
+(define (slice->string s)
+  (let* ([size (slice-size s)]
+         [data (slice-data s)]
+         [result (make-string size)])
+    (move-memory! data result size)
+    result))
+
+(define make-slice
+  (foreign-lambda* slice ()
+    "leveldb::Slice *x = new leveldb::Slice();
+     C_return(x);"))
+
 
 (define-class <status> () ((this '())))
 (define-foreign-type status (instance "leveldb::Status" <status>))
@@ -89,20 +122,20 @@
   (foreign-lambda* void ((DB db)) "delete db;"))
 
 (define c-leveldb-put
-  (foreign-lambda* void ((DB db) (stdstr key) (stdstr value) (status s))
+  (foreign-lambda* void ((DB db) (slice key) (slice value) (status s))
     "*s = db->Put(leveldb::WriteOptions(), *key, *value);"))
 
 (define (leveldb-put db key value)
-  (let ([keystr (string->stdstr key)]
-        [valstr (string->stdstr value)]
+  (let ([keystr (string->slice key)]
+        [valstr (string->slice value)]
         [status (make-status)])
     (c-leveldb-put db keystr valstr status)
-    (stdstr-delete keystr)
-    (stdstr-delete valstr)
+    (slice-delete keystr)
+    (slice-delete valstr)
     (check-status status)))
 
 (define c-leveldb-get
-  (foreign-lambda* void ((DB db) (stdstr key) (stdstr ret) (status s))
+  (foreign-lambda* void ((DB db) (slice key) (stdstr ret) (status s))
     "*s = db->Get(leveldb::ReadOptions(), *key, ret);"))
 
 (define (check-status s)
@@ -113,12 +146,12 @@
       (abort msg))))
 
 (define (leveldb-get db key)
-  (let* ([keystr (string->stdstr key)]
+  (let* ([keystr (string->slice key)]
          [ret (make-stdstr)]
          [status (make-status)]
          [void (c-leveldb-get db keystr ret status)]
          [result (stdstr->string ret)])
-    (stdstr-delete keystr)
+    (slice-delete keystr)
     (stdstr-delete ret)
     (check-status status)
     result)))
