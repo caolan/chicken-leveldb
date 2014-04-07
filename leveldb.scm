@@ -12,6 +12,10 @@
 (define-foreign-type DB (instance "leveldb::DB" <db>))
 
 
+(define-class <options> () ((this '())))
+(define-foreign-type options (instance "leveldb::Options" <options>))
+
+
 (define-class <stdstr> () ((this '())))
 (define-foreign-type stdstr (instance "std::string" <stdstr>))
 
@@ -66,14 +70,20 @@
   (foreign-lambda* void ((status s)) "delete s;"))
 
 
-(define leveldb-open
-  (foreign-lambda* DB ((c-string loc))
+(define c-leveldb-open
+  (foreign-lambda* DB ((c-string loc) (status s) (bool create) (bool noexist))
     "leveldb::DB* db;
      leveldb::Options options;
-     leveldb::Status status;
-     options.create_if_missing = true;
-     status = leveldb::DB::Open(options, loc, &db);
+     options.create_if_missing = create;
+     options.error_if_exists = noexist;
+     *s = leveldb::DB::Open(options, loc, &db);
      C_return(db);"))
+
+(define (leveldb-open loc #!key (create_if_missing #t) (error_if_exists #f))
+  (let* ([status (make-status)]
+         [db (c-leveldb-open loc status create_if_missing error_if_exists)])
+    (check-status status)
+    db))
 
 (define leveldb-close
   (foreign-lambda* void ((DB db)) "delete db;"))
