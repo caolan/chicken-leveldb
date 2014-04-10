@@ -1,11 +1,22 @@
 (module leveldb
-  (leveldb-open leveldb-close leveldb-put leveldb-get)
+  (
+   leveldb-open
+   leveldb-close
+   leveldb-put
+   leveldb-get
+   leveldb-make-batch
+   leveldb-write-batch
+   leveldb-abort-batch
+   leveldb-batch-put
+   leveldb-batch-delete
+   )
 
 (import scheme chicken foreign)
 (use coops lolevel)
 
 (foreign-declare "#include <iostream>")
 (foreign-declare "#include \"leveldb/db.h\"")
+(foreign-declare "#include \"leveldb/write_batch.h\"")
 
 
 (define-class <db> () ((this '())))
@@ -27,7 +38,7 @@
   (foreign-lambda* integer ((stdstr  str))
     "C_return(str->size());"))
 
-(define stdstr-delete
+(define delete-stdstr
   (foreign-lambda* void ((stdstr ret)) "delete ret;"))
 
 (define (string->stdstr str)
@@ -62,7 +73,7 @@
   (foreign-lambda* integer ((slice s))
     "C_return(s->size());"))
 
-(define slice-delete
+(define delete-slice
   (foreign-lambda* void ((slice s)) "delete s;"))
 
 (define (string->slice str)
@@ -99,7 +110,7 @@
 (define status-message
   (foreign-lambda* c-string ((status s)) "C_return(s->ToString().c_str());"))
 
-(define status-delete
+(define delete-status
   (foreign-lambda* void ((status s)) "delete s;"))
 
 
@@ -130,8 +141,8 @@
         [valstr (string->slice value)]
         [status (make-status)])
     (c-leveldb-put db keystr valstr status)
-    (slice-delete keystr)
-    (slice-delete valstr)
+    (delete-slice keystr)
+    (delete-slice valstr)
     (check-status status)))
 
 (define c-leveldb-get
@@ -140,9 +151,9 @@
 
 (define (check-status s)
   (if (status-ok? s)
-    (begin (status-delete s) #t)
+    (begin (delete-status s) #t)
     (let ([msg (status-message s)])
-      (status-delete s)
+      (delete-status s)
       (abort msg))))
 
 (define (leveldb-get db key)
@@ -151,7 +162,55 @@
          [status (make-status)]
          [void (c-leveldb-get db keystr ret status)]
          [result (stdstr->string ret)])
-    (slice-delete keystr)
-    (stdstr-delete ret)
+    (delete-slice keystr)
+    (delete-stdstr ret)
     (check-status status)
-    result)))
+    result))
+
+
+(define-class <batch> () ((this '())))
+(define-foreign-type batch (instance "leveldb::WriteBatch" <batch>))
+
+(define leveldb-make-batch
+  (foreign-lambda* batch ()
+    "leveldb::WriteBatch *x = new leveldb::WriteBatch();
+     C_return(x);"))
+
+(define delete-batch
+  (foreign-lambda* void ((batch b)) "delete b;"))
+
+(define c-leveldb-batch-put
+  (foreign-lambda* void ((batch batch) (slice key) (slice value) (status s))
+    "*s = batch->Put(leveldb::WriteOptions(), *key, *value);"))
+
+(define (leveldb-batch-put batch key value)
+  (let ([keystr (string->slice key)]
+        [valstr (string->slice value)]
+        [status (make-status)])
+    (c-leveldb-batch-put batch keystr valstr status)
+    (delete-slice keystr)
+    (delete-slice valstr)
+    (check-status status)))
+
+(define c-leveldb-batch-delete
+  (foreign-lambda* void ((batch batch) (slice key) (status s))
+    "*s = batch->Delete(leveldb::WriteOptions(), *key);"))
+
+(define (leveldb-batch-delete batch key)
+  (let ([keystr (string->slice key)]
+        [status (make-status)])
+    (c-leveldb-batch-delete batch keystr status)
+    (delete-slice keystr)
+    (check-status status)))
+
+(define c-leveldb-write-batch
+  (foreign-lambda* void ((DB db) (batch batch) (status s))
+    "*s = db->Write(leveldb::WriteOptions(), batch);"))
+
+(define (leveldb-write-batch db batch)
+  (let ([status (make-status)])
+    (c-leveldb-write-batch db batch status)
+    (delete-batch batch)
+    (check-status status)))
+
+(define leveldb-abort-batch delete-batch))
