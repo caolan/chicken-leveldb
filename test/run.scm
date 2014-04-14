@@ -1,6 +1,6 @@
 (use leveldb posix test)
 
-;; attempting to open db that doesn't exist
+; attempting to open db that doesn't exist
 (if (directory? "testdb")
   (delete-directory "testdb" #t))
 
@@ -9,8 +9,7 @@
 
 (define db (db-open "testdb"))
 
-(test "open db, put then get value"
-      "bar"
+(test "put then get value" "bar"
       (begin
         (db-put db "foo" "bar")
         (db-get db "foo")))
@@ -35,6 +34,7 @@
             (db-open "testdb" error_if_exists: #t))
 
 (test-assert "opening existing db should not error by default"
-             (db-open "testdb"))
+             (db-close (db-open "testdb")))
 
+(db-close db)
 (test-exit)
