@@ -10,6 +10,7 @@
    ;db-range
    ;
    ;call-with-iter
+   ;make-iter [start]
    ;iter-next
    ;iter-prev
    ;iter-seek
