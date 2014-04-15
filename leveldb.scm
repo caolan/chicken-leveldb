@@ -20,9 +20,6 @@
    iter-value
    iter-status
    close-iterator
-   status-ok?
-   status-message
-   delete-status
    )
 
 (import scheme chicken foreign)
@@ -294,9 +291,12 @@
     "*s = it->status();"))
 
 (define (iter-status iter)
-  (let ([status (make-status)])
-    (c-iter-status iter status)
-    status))
+  (let* ([status (make-status)]
+         [void (c-iter-status iter status)]
+         [ok (status-ok? status)]
+         [msg (status-message status)])
+    (delete-status status)
+    (list ok msg)))
 
 (define close-iterator
   (foreign-lambda* void ((iter it)) "delete it;")))
