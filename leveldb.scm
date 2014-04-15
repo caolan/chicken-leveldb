@@ -5,7 +5,7 @@
    db-close
    db-get
    db-put
-   ;db-del
+   db-del
    db-batch
    ;db-range
    ;
@@ -124,6 +124,13 @@
   (foreign-lambda* void ((status s)) "delete s;"))
 
 
+(define (check-status s)
+  (if (status-ok? s)
+    (begin (delete-status s) #t)
+    (let ([msg (status-message s)])
+      (delete-status s)
+      (abort msg))))
+
 (define c-leveldb-open
   (foreign-lambda* DB ((c-string loc) (status s) (bool create) (bool noexist))
     "leveldb::DB* db;
@@ -159,13 +166,6 @@
   (foreign-lambda* void ((DB db) (slice key) (stdstr ret) (status s))
     "*s = db->Get(leveldb::ReadOptions(), *key, ret);"))
 
-(define (check-status s)
-  (if (status-ok? s)
-    (begin (delete-status s) #t)
-    (let ([msg (status-message s)])
-      (delete-status s)
-      (abort msg))))
-
 (define (db-get db key)
   (let* ([keystr (string->slice key)]
          [ret (make-stdstr)]
@@ -177,6 +177,16 @@
     (check-status status)
     result))
 
+(define c-leveldb-del
+  (foreign-lambda* void ((DB db) (slice key) (status s))
+    "*s = db->Delete(leveldb::WriteOptions(), *key);"))
+
+(define (db-del db key)
+  (let* ([keystr (string->slice key)]
+         [status (make-status)]
+         [void (c-leveldb-del db keystr status)])
+    (delete-slice keystr)
+    (check-status status)))
 
 (define-class <batch> () ((this '())))
 (define-foreign-type batch (instance "leveldb::WriteBatch" <batch>))

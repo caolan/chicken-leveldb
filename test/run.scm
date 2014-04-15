@@ -21,6 +21,11 @@
 
 (test-error "attempt to get missing key" (db-get db "asdf"))
 
+;; delete previously added keys
+(db-del db "foo")
+(db-del db (list->string '(#\f #\o #\o #\nul)))
+(test-error "attempt to get foo after deleting should error" (db-get db "foo"))
+
 (define ops '((put "one" "1")
               (put "two" "2")
               (put "three" "3")))
@@ -29,6 +34,25 @@
 (test "get one after batch" "1" (db-get db "one"))
 (test "get two after batch" "2" (db-get db "two"))
 (test "get three after batch" "3" (db-get db "three"))
+
+;(define iter (make-iter db))
+;(iter-seek-first iter)
+;(iter-next iter)
+;(test "iter one key" "one" (iter-key iter))
+;(test "iter one value" "1" (iter-value iter))
+;(test "iter is valid" #t (iter-valid? iter))
+;(iter-next iter)
+;(test "iter two key" "two" (iter-key iter))
+;(test "iter two value" "2" (iter-value iter))
+;(test "iter is valid" #t (iter-valid? iter))
+;(iter-next iter)
+;(test "iter three key" "three" (iter-key iter))
+;(test "iter three value" "3" (iter-value iter))
+;(test "iter is valid" #t (iter-valid? iter))
+;(iter-next iter)
+;(test "iter is not valid at end" #f (iter-valid? iter))
+;(display (iter-status iter))
+;(delete-iter iter)
 
 (test-error "opening existing db should error when error_if_exists: #t"
             (db-open "testdb" error_if_exists: #t))
