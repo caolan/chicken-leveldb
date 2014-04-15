@@ -1,16 +1,16 @@
 (module leveldb
   (
-   ;call-with-db filename proc
-   db-open
-   db-close
+   ;call-with-database filename proc
+   open-database
+   close-database
    db-get
    db-put
    db-del
    db-batch
-   ;db-range
-   ;
+   ;call-with-sequence start: end: limit: reverse: fill-cache: values: keys:
    ;call-with-iterator
    open-iterator
+   close-iterator
    iter-next!
    iter-prev!
    iter-seek!
@@ -19,7 +19,6 @@
    iter-key
    iter-value
    iter-status
-   close-iterator
    )
 
 (import scheme chicken foreign)
@@ -141,13 +140,13 @@
      *s = leveldb::DB::Open(options, loc, &db);
      C_return(db);"))
 
-(define (db-open loc #!key (create_if_missing #t) (error_if_exists #f))
+(define (open-database loc #!key (create_if_missing #t) (error_if_exists #f))
   (let* ([status (make-status)]
          [db (c-leveldb-open loc status create_if_missing error_if_exists)])
     (check-status status)
     db))
 
-(define db-close
+(define close-database
   (foreign-lambda* void ((DB db)) "delete db;"))
 
 (define c-leveldb-put
