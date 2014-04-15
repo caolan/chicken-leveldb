@@ -9,16 +9,20 @@
    db-batch
    ;db-range
    ;
-   ;call-with-iter
-   ;make-iter [start]
-   ;iter-next
-   ;iter-prev
-   ;iter-seek
-   ;iter-seek-first
-   ;iter-valid?
-   ;iter-key
-   ;iter-value
-   ;iter-status
+   ;call-with-iterator
+   open-iterator
+   iter-next!
+   iter-prev!
+   iter-seek!
+   iter-seek-first!
+   iter-valid?
+   iter-key
+   iter-value
+   iter-status
+   close-iterator
+   status-ok?
+   status-message
+   delete-status
    )
 
 (import scheme chicken foreign)
@@ -240,4 +244,59 @@
     (fill-batch batch ops)
     (c-leveldb-write-batch db batch status)
     (delete-batch batch)
-    (check-status status))))
+    (check-status status)))
+
+(define-class <iter> () ((this '())))
+(define-foreign-type iter (instance "leveldb::Iterator" <iter>))
+
+(define open-iterator
+  (foreign-lambda* iter ((DB db))
+    "leveldb::Iterator* x = db->NewIterator(leveldb::ReadOptions());
+     C_return(x);"))
+
+(define iter-next! (foreign-lambda* void ((iter it)) "it->Next();"))
+(define iter-prev! (foreign-lambda* void ((iter it)) "it->Prev();"))
+
+(define c-iter-seek
+  (foreign-lambda* void ((iter it) (slice start)) "it->Seek(*start);"))
+
+(define (iter-seek! iter key)
+  (let ([keyslice (string->slice key)])
+    (c-iter-seek iter (string->slice key))
+    (delete-slice keyslice)))
+
+(define iter-seek-first!
+  (foreign-lambda* void ((iter it)) "it->SeekToFirst();"))
+
+(define iter-valid?
+  (foreign-lambda* bool ((iter it)) "C_return(it->Valid());"))
+
+(define c-iter-key (foreign-lambda* void ((iter it) (slice ret)) "*ret = it->key();"))
+
+(define (iter-key iter)
+  (let* ([ret (make-slice)]
+         [void (c-iter-key iter ret)]
+         [result (slice->string ret)])
+    (delete-slice ret)
+    result))
+
+(define c-iter-value (foreign-lambda* void ((iter it) (slice ret)) "*ret = it->value();"))
+
+(define (iter-value iter)
+  (let* ([ret (make-slice)]
+         [void (c-iter-value iter ret)]
+         [result (slice->string ret)])
+    (delete-slice ret)
+    result))
+
+(define c-iter-status
+  (foreign-lambda* void ((iter it) (status s))
+    "*s = it->status();"))
+
+(define (iter-status iter)
+  (let ([status (make-status)])
+    (c-iter-status iter status)
+    status))
+
+(define close-iterator
+  (foreign-lambda* void ((iter it)) "delete it;")))
