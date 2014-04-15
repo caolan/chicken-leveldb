@@ -3,22 +3,29 @@
    ;call-with-database filename proc
    open-database
    close-database
-   db-get
-   db-put
-   db-del
-   db-batch
+   get
+   put
+   delete
+   batch
+   ;pairs start: end: limit: reverse: fill-cache: (lambda (pairs)
+   ;values start: end: limit: reverse: fill-cache: (lambda (vals)
+   ;keys start: end: limit: reverse: fill-cache: (lambda (keys)
+   ;
+   ;
+   ;sequence start: end: limit: reverse: fill-cache: values: keys: (lambda (pairs)
    ;call-with-sequence start: end: limit: reverse: fill-cache: values: keys:
+   ;
    ;call-with-iterator
-   open-iterator
-   close-iterator
-   iter-next!
-   iter-prev!
-   iter-seek!
-   iter-seek-first!
-   iter-valid?
-   iter-key
-   iter-value
-   iter-status
+   ;open-iterator :fill-cache
+   ;close-iterator
+   ;iterator-next!
+   ;iterator-prev!
+   ;iterator-seek!
+   ;iterator-seek-first!
+   ;iterator-valid?
+   ;iterator-key
+   ;iterator-value
+   ;iterator-status
    )
 
 (import scheme chicken foreign)
