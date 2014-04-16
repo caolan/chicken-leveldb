@@ -1,12 +1,19 @@
 (module leveldb
   (
-   ;call-with-database filename proc
-   open-database
-   close-database
-   get
-   put
-   delete
-   batch
+   ;call-with-db
+   open-db
+   close-db
+   db-get
+   db-put
+   db-delete
+   db-batch
+   ;db-stream
+   ;
+   ;
+   ;
+   ;db-pairs
+   ;db-values
+   ;db-keys
    ;pairs start: end: limit: reverse: fill-cache: (lambda (pairs)
    ;values start: end: limit: reverse: fill-cache: (lambda (vals)
    ;keys start: end: limit: reverse: fill-cache: (lambda (keys)
@@ -147,13 +154,13 @@
      *s = leveldb::DB::Open(options, loc, &db);
      C_return(db);"))
 
-(define (open-database loc #!key (create_if_missing #t) (error_if_exists #f))
+(define (open-db loc #!key (create_if_missing #t) (error_if_exists #f))
   (let* ([status (make-status)]
          [db (c-leveldb-open loc status create_if_missing error_if_exists)])
     (check-status status)
     db))
 
-(define close-database
+(define close-db
   (foreign-lambda* void ((DB db)) "delete db;"))
 
 (define c-leveldb-put
@@ -188,7 +195,7 @@
   (foreign-lambda* void ((DB db) (slice key) (status s))
     "*s = db->Delete(leveldb::WriteOptions(), *key);"))
 
-(define (db-del db key)
+(define (db-delete db key)
   (let* ([keystr (string->slice key)]
          [status (make-status)]
          [void (c-leveldb-del db keystr status)])
