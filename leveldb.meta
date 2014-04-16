@@ -2,7 +2,7 @@
  (synopsis "Bindings to leveldb")
  (category db)
  (doc-from-wiki)
- (needs coops)
+ (needs coops lazy-seq)
  (test-depends test)
  (license "BSD")
  (author "Caolan McMahon")

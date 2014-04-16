@@ -7,7 +7,7 @@
    db-put
    db-delete
    db-batch
-   ;db-stream
+   db-stream
    ;
    ;
    ;
@@ -36,7 +36,7 @@
    )
 
 (import scheme chicken foreign)
-(use coops lolevel)
+(use coops lazy-seq lolevel)
 
 (foreign-declare "#include <iostream>")
 (foreign-declare "#include \"leveldb/db.h\"")
@@ -299,6 +299,9 @@
     (delete-slice ret)
     result))
 
+(define (iter-pair iter)
+  (list (iter-key iter) (iter-value iter)))
+
 (define c-iter-status
   (foreign-lambda* void ((iter it) (status s))
     "*s = it->status();"))
@@ -312,4 +315,22 @@
     (list ok msg)))
 
 (define close-iterator
-  (foreign-lambda* void ((iter it)) "delete it;")))
+  (foreign-lambda* void ((iter it)) "delete it;"))
+
+(define (make-stream it)
+  (lazy-seq
+    (if (iter-valid? it)
+      (let ([pair (iter-pair it)])
+        (iter-next! it)
+        (cons pair (make-stream it)))
+      '())))
+
+(define (db-stream db thunk #!key start limit)
+  (let ([it (open-iterator db)])
+    (if (eq? start #f)
+      (iter-seek-first! it)
+      (iter-seek! it start))
+    (let* ([seq (make-stream it)]
+           [result (thunk seq)])
+      (close-iterator it)
+      result))))

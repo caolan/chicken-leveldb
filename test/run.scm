@@ -1,4 +1,4 @@
-(use leveldb posix test)
+(use leveldb posix test lazy-seq)
 
 ; attempting to open db that doesn't exist
 (if (directory? "testdb")
@@ -63,6 +63,10 @@
   ;(test "iter seek 3 value is three" "three" (iter-value iter))
   ;(test "iter is valid" #t (iter-valid? iter))
   ;(close-iterator iter)
+
+  (test "stream from 2 limit 1"
+        '(("2" "two"))
+        (db-stream db lazy-seq->list start: "2" limit: 1))
 
   (test-error "opening existing db should error when error_if_exists: #t"
               (open-db "testdb" error_if_exists: #t))
