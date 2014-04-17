@@ -68,6 +68,10 @@
         '(("2" "two"))
         (db-stream db lazy-seq->list start: "2" limit: 1))
 
+  (test "stream from 2 limit 2"
+        '(("2" "two") ("3" "three"))
+        (db-stream db lazy-seq->list start: "2" limit: 2))
+
   (test-error "opening existing db should error when error_if_exists: #t"
               (open-db "testdb" error_if_exists: #t))
 

@@ -317,20 +317,26 @@
 (define close-iterator
   (foreign-lambda* void ((iter it)) "delete it;"))
 
-(define (make-stream it)
+(define (make-stream it limit)
+  (cond [limit (make-stream-limit it limit)]
+        [else (abort "not implemented")]))
+
+(define (make-stream-limit it limit)
   (lazy-seq
-    (if (iter-valid? it)
-      (let ([pair (iter-pair it)])
-        (iter-next! it)
-        (cons pair (make-stream it)))
-      '())))
+    (cond [(eq? limit 0) '()]
+          [(iter-valid? it)
+           (let ([pair (iter-pair it)])
+             (iter-next! it)
+             (cons pair (make-stream-limit it (- limit 1))))]
+          [else
+            '()])))
 
 (define (db-stream db thunk #!key start limit)
   (let ([it (open-iterator db)])
     (if (eq? start #f)
       (iter-seek-first! it)
       (iter-seek! it start))
-    (let* ([seq (make-stream it)]
+    (let* ([seq (make-stream it limit)]
            [result (thunk seq)])
       (close-iterator it)
       result))))
