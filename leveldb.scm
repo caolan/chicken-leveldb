@@ -236,7 +236,9 @@
 
 (define open-iterator
   (foreign-lambda* iter ((DB db))
-    "leveldb::Iterator* x = db->NewIterator(leveldb::ReadOptions());
+    "leveldb::ReadOptions options;
+     options.fill_cache = false;
+     leveldb::Iterator* x = db->NewIterator(options);
      C_return(x);"))
 
 (define iter-next! (foreign-lambda* void ((iter it)) "it->Next();"))
