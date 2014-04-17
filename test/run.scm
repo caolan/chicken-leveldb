@@ -37,33 +37,6 @@
   (test "get 2 after batch" "two" (db-get db "2"))
   (test "get 3 after batch" "three" (db-get db "3"))
 
-  ;(define iter (open-iterator db))
-  ;(iter-seek-first! iter)
-  ;(test "iter next key is 1" "1" (iter-key iter))
-  ;(test "iter next value is one" "one" (iter-value iter))
-  ;(test "iter is valid" #t (iter-valid? iter))
-  ;(iter-next! iter)
-  ;(test "iter next key is 2" "2" (iter-key iter))
-  ;(test "iter next value is two" "two" (iter-value iter))
-  ;(test "iter is valid" #t (iter-valid? iter))
-  ;(iter-next! iter)
-  ;(test "iter next key is 3" "3" (iter-key iter))
-  ;(test "iter next value is three" "three" (iter-value iter))
-  ;(test "iter is valid" #t (iter-valid? iter))
-  ;(iter-prev! iter)
-  ;(test "iter prev key is 2" "2" (iter-key iter))
-  ;(test "iter prev value is two" "two" (iter-value iter))
-  ;(test "iter is valid" #t (iter-valid? iter))
-  ;(iter-next! iter)
-  ;(iter-next! iter)
-  ;(test "iter next next is not valid - at end" #f (iter-valid? iter))
-  ;(test "status is OK" '(#t "OK") (iter-status iter))
-  ;(iter-seek! iter "3")
-  ;(test "iter seek 3 key is 3" "3" (iter-key iter))
-  ;(test "iter seek 3 value is three" "three" (iter-value iter))
-  ;(test "iter is valid" #t (iter-valid? iter))
-  ;(close-iterator iter)
-
   (test "stream from 2 limit 1"
         '(("2" "two"))
         (db-stream db lazy-seq->list start: "2" limit: 1))
@@ -71,6 +44,14 @@
   (test "stream from 2 limit 2"
         '(("2" "two") ("3" "three"))
         (db-stream db lazy-seq->list start: "2" limit: 2))
+
+  (test "stream from start limit 2"
+        '(("1" "one") ("2" "two"))
+        (db-stream db lazy-seq->list limit: 2))
+
+  (test "stream from start no limit"
+        '(("1" "one") ("2" "two") ("3" "three"))
+        (db-stream db lazy-seq->list))
 
   (test-error "opening existing db should error when error_if_exists: #t"
               (open-db "testdb" error_if_exists: #t))

@@ -7,32 +7,7 @@
    db-put
    db-delete
    db-batch
-   db-stream
-   ;
-   ;
-   ;
-   ;db-pairs
-   ;db-values
-   ;db-keys
-   ;pairs start: end: limit: reverse: fill-cache: (lambda (pairs)
-   ;values start: end: limit: reverse: fill-cache: (lambda (vals)
-   ;keys start: end: limit: reverse: fill-cache: (lambda (keys)
-   ;
-   ;
-   ;sequence start: end: limit: reverse: fill-cache: values: keys: (lambda (pairs)
-   ;call-with-sequence start: end: limit: reverse: fill-cache: values: keys:
-   ;
-   ;call-with-iterator
-   ;open-iterator :fill-cache
-   ;close-iterator
-   ;iterator-next!
-   ;iterator-prev!
-   ;iterator-seek!
-   ;iterator-seek-first!
-   ;iterator-valid?
-   ;iterator-key
-   ;iterator-value
-   ;iterator-status
+   db-stream ;start: end: limit: reverse: fill-cache:
    )
 
 (import scheme chicken foreign)
@@ -318,16 +293,13 @@
   (foreign-lambda* void ((iter it)) "delete it;"))
 
 (define (make-stream it limit)
-  (cond [limit (make-stream-limit it limit)]
-        [else (abort "not implemented")]))
-
-(define (make-stream-limit it limit)
   (lazy-seq
     (cond [(eq? limit 0) '()]
           [(iter-valid? it)
-           (let ([pair (iter-pair it)])
+           (let ([pair (iter-pair it)]
+                 [nextlimit (and limit (- limit 1))])
              (iter-next! it)
-             (cons pair (make-stream-limit it (- limit 1))))]
+             (cons pair (make-stream it nextlimit)))]
           [else
             '()])))
 
