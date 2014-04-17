@@ -65,6 +65,22 @@
         '(("2" "two"))
         (db-stream db lazy-seq->list start: "2" end: "3" limit: 1))
 
+  (test "stream keys from start 1 end 3"
+        '("1" "2" "3")
+        (db-stream db lazy-seq->list
+                   start: "1"
+                   end: "3"
+                   key: #t
+                   value: #f))
+
+  (test "stream values from start 1 end 3"
+        '("one" "two" "three")
+        (db-stream db lazy-seq->list
+                   start: "1"
+                   end: "3"
+                   key: #f
+                   value: #t))
+
   (test-error "opening existing db should error when error_if_exists: #t"
               (open-db "testdb" error_if_exists: #t))
 

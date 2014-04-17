@@ -289,29 +289,36 @@
 (define close-iterator
   (foreign-lambda* void ((iter it)) "delete it;"))
 
-(define (make-stream it end limit)
+(define (make-stream-value usekey usevalue k it)
+  (cond [(and usekey usevalue)
+         (list (or k (iter-key it)) (iter-value it))]
+        [usevalue
+          (iter-value it)]
+        [else 
+          (or k (iter-key it))]))
+
+(define (make-stream it end limit usekey usevalue)
   (lazy-seq
     (cond [(eq? limit 0)
            '()]
           [(iter-valid? it)
-           (let* ([key (iter-key it)]
-                  [value (iter-value it)]
-                  [pair (list key value)]
+           (let* ([k (and end (iter-key it))]
                   [nextlimit (and limit (- limit 1))])
-             (if (and end (string>? key end))
-               '()
+             (if (and end (string>? k end)) '()
                (begin
-                 (iter-next! it)
-                 (cons pair (make-stream it end nextlimit)))))]
+                 (let ([result (make-stream-value usekey usevalue k it)])
+                   (iter-next! it)
+                   (cons result
+                         (make-stream it end nextlimit usekey usevalue))))))]
           [else
             '()])))
 
-(define (db-stream db thunk #!key start end limit)
+(define (db-stream db thunk #!key start end limit (key #t) (value #t))
   (let ([it (open-iterator db)])
     (if (eq? start #f)
       (iter-seek-first! it)
       (iter-seek! it start))
-    (let* ([seq (make-stream it end limit)]
+    (let* ([seq (make-stream it end limit key value)]
            [result (thunk seq)])
       (close-iterator it)
       result))))
