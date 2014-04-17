@@ -296,21 +296,21 @@
           [key (or k (iter-key it))]
           [else '()])))
 
-(define (stream-next it end limit make-value end?)
+(define (stream-next it end limit make-value end? next)
   (let* ([k (and end (iter-key it))]
          [nextlimit (and limit (- limit 1))])
     (if (not (end? end k))
       (let* ([head (make-value k it)]
-             [void (iter-next! it)]
-             [tail (make-stream it end nextlimit make-value end?)])
+             [void (next it)]
+             [tail (make-stream it end nextlimit make-value end? next)])
         (cons head tail))
       '())))
 
-(define (make-stream it end limit make-value end?)
+(define (make-stream it end limit make-value end? next)
   (lazy-seq
     (cond [(eq? limit 0) '()]
           [(iter-valid? it)
-           (stream-next it end limit make-value end?)]
+           (stream-next it end limit make-value end? next)]
           [else '()])))
 
 (define (init-stream it start)
@@ -318,12 +318,17 @@
     (iter-seek-first! it)
     (iter-seek! it start)))
 
-(define (db-stream db thunk #!key start end limit (key #t) (value #t))
+(define (stream-end? reverse)
+  (let ([compare (if reverse string<? string>?)])
+    (lambda (end k) (and end (compare k end)))))
+
+(define (db-stream db thunk #!key start end limit reverse (key #t) (value #t))
   (let* ([it (open-iterator db)]
          [void (init-stream it start)]
          [seq (make-stream it end limit
                            (make-stream-value key value)
-                           (lambda (end k) (and end (string>? k end))))]
+                           (stream-end? reverse)
+                           (if reverse iter-prev! iter-next!))]
          [result (thunk seq)])
       (close-iterator it)
       result)))

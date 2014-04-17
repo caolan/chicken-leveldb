@@ -81,6 +81,14 @@
                    key: #f
                    value: #t))
 
+  (test "stream reverse start 3 end 2"
+        '(("3" "three") ("2" "two"))
+        (db-stream db lazy-seq->list reverse: #t start: "3" end: "2"))
+
+  (test "stream reverse start 3 limit 3"
+        '(("3" "three") ("2" "two") ("1" "one"))
+        (db-stream db lazy-seq->list reverse: #t start: "3" limit: 3))
+
   (test-error "opening existing db should error when error_if_exists: #t"
               (open-db "testdb" error_if_exists: #t))
 
