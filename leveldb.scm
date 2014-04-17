@@ -274,9 +274,6 @@
     (delete-slice ret)
     result))
 
-(define (iter-pair iter)
-  (list (iter-key iter) (iter-value iter)))
-
 (define c-iter-status
   (foreign-lambda* void ((iter it) (status s))
     "*s = it->status();"))
@@ -292,23 +289,29 @@
 (define close-iterator
   (foreign-lambda* void ((iter it)) "delete it;"))
 
-(define (make-stream it limit)
+(define (make-stream it end limit)
   (lazy-seq
-    (cond [(eq? limit 0) '()]
+    (cond [(eq? limit 0)
+           '()]
           [(iter-valid? it)
-           (let ([pair (iter-pair it)]
-                 [nextlimit (and limit (- limit 1))])
-             (iter-next! it)
-             (cons pair (make-stream it nextlimit)))]
+           (let* ([key (iter-key it)]
+                  [value (iter-value it)]
+                  [pair (list key value)]
+                  [nextlimit (and limit (- limit 1))])
+             (if (and end (string>? key end))
+               '()
+               (begin
+                 (iter-next! it)
+                 (cons pair (make-stream it end nextlimit)))))]
           [else
             '()])))
 
-(define (db-stream db thunk #!key start limit)
+(define (db-stream db thunk #!key start end limit)
   (let ([it (open-iterator db)])
     (if (eq? start #f)
       (iter-seek-first! it)
       (iter-seek! it start))
-    (let* ([seq (make-stream it limit)]
+    (let* ([seq (make-stream it end limit)]
            [result (thunk seq)])
       (close-iterator it)
       result))))
