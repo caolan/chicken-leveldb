@@ -289,36 +289,39 @@
 (define close-iterator
   (foreign-lambda* void ((iter it)) "delete it;"))
 
-(define (make-stream-value usekey usevalue k it)
-  (cond [(and usekey usevalue)
-         (list (or k (iter-key it)) (iter-value it))]
-        [usevalue
-          (iter-value it)]
-        [else 
-          (or k (iter-key it))]))
+(define (make-stream-value key value)
+  (lambda (k it)
+    (cond [(and key value) (list (or k (iter-key it)) (iter-value it))]
+          [value (iter-value it)]
+          [key (or k (iter-key it))]
+          [else '()])))
 
-(define (make-stream it end limit usekey usevalue)
+(define (stream-next it end limit make-value)
+  (let* ([k (and end (iter-key it))]
+         [nextlimit (and limit (- limit 1))]
+         [continue (not (and end (string>? k end)))])
+    (if continue
+      (let* ([head (make-value k it)]
+             [void (iter-next! it)]
+             [tail (make-stream it end nextlimit make-value)])
+        (cons head tail))
+      '())))
+
+(define (make-stream it end limit make-value)
   (lazy-seq
-    (cond [(eq? limit 0)
-           '()]
-          [(iter-valid? it)
-           (let* ([k (and end (iter-key it))]
-                  [nextlimit (and limit (- limit 1))])
-             (if (and end (string>? k end)) '()
-               (begin
-                 (let ([result (make-stream-value usekey usevalue k it)])
-                   (iter-next! it)
-                   (cons result
-                         (make-stream it end nextlimit usekey usevalue))))))]
-          [else
-            '()])))
+    (cond [(eq? limit 0) '()]
+          [(iter-valid? it) (stream-next it end limit make-value)]
+          [else '()])))
+
+(define (init-stream it start)
+  (if (eq? start #f)
+    (iter-seek-first! it)
+    (iter-seek! it start)))
 
 (define (db-stream db thunk #!key start end limit (key #t) (value #t))
-  (let ([it (open-iterator db)])
-    (if (eq? start #f)
-      (iter-seek-first! it)
-      (iter-seek! it start))
-    (let* ([seq (make-stream it end limit key value)]
-           [result (thunk seq)])
+  (let* ([it (open-iterator db)]
+         [void (init-stream it start)]
+         [seq (make-stream it end limit (make-stream-value key value))]
+         [result (thunk seq)])
       (close-iterator it)
-      result))))
+      result)))
