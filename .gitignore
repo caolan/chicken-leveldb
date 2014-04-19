@@ -5,3 +5,4 @@
 /leveldb.import.c
 /leveldb.import.scm
 /testdb
+/test/run
