@@ -139,14 +139,16 @@
   (foreign-lambda* void ((DB db)) "delete db;"))
 
 (define c-leveldb-put
-  (foreign-lambda* void ((DB db) (slice key) (slice value) (status s))
-    "*s = db->Put(leveldb::WriteOptions(), *key, *value);"))
+  (foreign-lambda* void ((DB db) (slice key) (slice value) (status s) (bool sync))
+    "leveldb::WriteOptions write_options;
+     write_options.sync = sync;
+     *s = db->Put(write_options, *key, *value);"))
 
-(define (db-put db key value)
+(define (db-put db key value #!key (sync #f))
   (let ([keystr (string->slice key)]
         [valstr (string->slice value)]
         [status (make-status)])
-    (c-leveldb-put db keystr valstr status)
+    (c-leveldb-put db keystr valstr status sync)
     (delete-slice keystr)
     (delete-slice valstr)
     (check-status status)))
@@ -167,13 +169,15 @@
     result))
 
 (define c-leveldb-del
-  (foreign-lambda* void ((DB db) (slice key) (status s))
-    "*s = db->Delete(leveldb::WriteOptions(), *key);"))
+  (foreign-lambda* void ((DB db) (slice key) (status s) (bool sync))
+    "leveldb::WriteOptions write_options;
+     write_options.sync = sync;
+     *s = db->Delete(write_options, *key);"))
 
-(define (db-delete db key)
+(define (db-delete db key #!key (sync #f))
   (let* ([keystr (string->slice key)]
          [status (make-status)]
-         [void (c-leveldb-del db keystr status)])
+         [void (c-leveldb-del db keystr status sync)])
     (delete-slice keystr)
     (check-status status)))
 
@@ -209,8 +213,10 @@
     (delete-slice keystr)))
 
 (define c-leveldb-write-batch
-  (foreign-lambda* void ((DB db) (batch batch) (status s))
-    "*s = db->Write(leveldb::WriteOptions(), batch);"))
+  (foreign-lambda* void ((DB db) (batch batch) (status s) (bool sync))
+    "leveldb::WriteOptions write_options;
+     write_options.sync = sync;
+     *s = db->Write(write_options, batch);"))
 
 (define (fill-batch batch ops)
   (if (null? ops) batch
@@ -220,14 +226,15 @@
            [val (caddr op)])
       (cond [(eq? 'put type) (leveldb-batch-put batch key val)]
             [(eq? 'del type) (leveldb-batch-del batch key)]
-            [else (abort (sprintf "Unknown type: ~S" type))])
+            [else
+              (abort (sprintf "Unknown type for batch operation: ~S" type))])
       (fill-batch batch (cdr ops)))))
 
-(define (db-batch db ops)
+(define (db-batch db ops #!key (sync #f))
   (let ([batch (make-batch)]
         [status (make-status)])
     (fill-batch batch ops)
-    (c-leveldb-write-batch db batch status)
+    (c-leveldb-write-batch db batch status sync)
     (delete-batch batch)
     (check-status status)))
 
@@ -235,9 +242,9 @@
 (define-foreign-type iter (instance "leveldb::Iterator" <iter>))
 
 (define open-iterator
-  (foreign-lambda* iter ((DB db))
+  (foreign-lambda* iter ((DB db) (bool fillcache))
     "leveldb::ReadOptions options;
-     options.fill_cache = false;
+     options.fill_cache = fillcache;
      leveldb::Iterator* x = db->NewIterator(options);
      C_return(x);"))
 
@@ -258,7 +265,8 @@
 (define iter-valid?
   (foreign-lambda* bool ((iter it)) "C_return(it->Valid());"))
 
-(define c-iter-key (foreign-lambda* void ((iter it) (slice ret)) "*ret = it->key();"))
+(define c-iter-key
+  (foreign-lambda* void ((iter it) (slice ret)) "*ret = it->key();"))
 
 (define (iter-key iter)
   (let* ([ret (make-slice)]
@@ -267,7 +275,8 @@
     (delete-slice ret)
     result))
 
-(define c-iter-value (foreign-lambda* void ((iter it) (slice ret)) "*ret = it->value();"))
+(define c-iter-value
+  (foreign-lambda* void ((iter it) (slice ret)) "*ret = it->value();"))
 
 (define (iter-value iter)
   (let* ([ret (make-slice)]
@@ -324,8 +333,9 @@
   (let ([compare (if reverse string<? string>?)])
     (lambda (end k) (and end (compare k end)))))
 
-(define (db-stream db thunk #!key start end limit reverse (key #t) (value #t))
-  (let* ([it (open-iterator db)]
+(define (db-stream db thunk
+                   #!key start end limit reverse (key #t) (value #t) fillcache)
+  (let* ([it (open-iterator db fillcache)]
          [void (init-stream it start)]
          [seq (make-stream it end limit
                            (make-stream-value key value)
