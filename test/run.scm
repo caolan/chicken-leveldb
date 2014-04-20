@@ -6,7 +6,7 @@
 
 (test-group "basic operation"
   (test-error "opening missing db should error when create_if_missing: #f"
-              (open-db "testdb" create_if_missing: #f))
+              (open-db "testdb" create: #f))
 
   (define db (open-db "testdb"))
 
@@ -89,8 +89,8 @@
         '(("3" "three") ("2" "two") ("1" "one"))
         (db-stream db lazy-seq->list reverse: #t start: "3" limit: 3))
 
-  (test-error "opening existing db should error when error_if_exists: #t"
-              (open-db "testdb" error_if_exists: #t))
+  (test-error "opening existing db should error when exists: #f"
+              (open-db "testdb" exists: #f))
 
   (test-assert "opening existing db should not error by default"
                (close-db (open-db "testdb")))

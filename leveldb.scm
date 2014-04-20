@@ -121,27 +121,25 @@
       (abort msg))))
 
 (define c-leveldb-open
-  (foreign-lambda* DB ((c-string loc) (status s) (bool create) (bool noexist))
+  (foreign-lambda* DB ((c-string loc) (status s) (bool create) (bool exists))
     "leveldb::DB* db;
      leveldb::Options options;
      options.create_if_missing = create;
-     options.error_if_exists = noexist;
+     options.error_if_exists = !exists;
      *s = leveldb::DB::Open(options, loc, &db);
      C_return(db);"))
 
-(define (open-db loc #!key (create_if_missing #t) (error_if_exists #f))
+(define (open-db loc #!key (create #t) (exists #t))
   (let* ([status (make-status)]
-         [db (c-leveldb-open loc status create_if_missing error_if_exists)])
+         [db (c-leveldb-open loc status create exists)])
     (check-status status)
     db))
 
 (define close-db
   (foreign-lambda* void ((DB db)) "delete db;"))
 
-(define (call-with-db loc proc #!key (create_if_missing #t) (error_if_exists #f))
-  (let* ([db (open-db loc
-                      create_if_missing: create_if_missing
-                      error_if_exists: error_if_exists)]
+(define (call-with-db loc proc #!key (create #t) (exists #t))
+  (let* ([db (open-db loc create: create exists: exists)]
          [c (current-exception-handler)]
          [result (with-exception-handler
                    (lambda (ex) (close-db db) (c ex))
