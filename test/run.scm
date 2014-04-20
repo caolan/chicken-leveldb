@@ -29,8 +29,10 @@
   (test-error "attempt to get foo after deleting should error" (db-get db "foo"))
 
   (define ops '((put "1" "one")
+                (put "asdf" "asdf")
                 (put "2" "two")
-                (put "3" "three")))
+                (put "3" "three")
+                (delete "asdf")))
 
   (db-batch db ops)
   (test "get 1 after batch" "one" (db-get db "1"))

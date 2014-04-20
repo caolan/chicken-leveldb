@@ -231,10 +231,9 @@
   (if (null? ops) batch
     (let* ([op (car ops)]
            [type (car op)]
-           [key (cadr op)]
-           [val (caddr op)])
-      (cond [(eq? 'put type) (leveldb-batch-put batch key val)]
-            [(eq? 'del type) (leveldb-batch-del batch key)]
+           [key (cadr op)])
+      (cond [(eq? 'put type) (leveldb-batch-put batch key (caddr op))]
+            [(eq? 'delete type) (leveldb-batch-del batch key)]
             [else
               (abort (sprintf "Unknown type for batch operation: ~S" type))])
       (fill-batch batch (cdr ops)))))
