@@ -25,7 +25,7 @@ will mean an exception occurs if the database does not exist.
 Closes database `db`.
 
 ```scheme
-(call-with-db loc proc #!key (create #t) (error #t))
+(call-with-db loc proc #!key (create #t) (exists #t))
 ```
 
 Opens database at `loc` and calls (proc db). The database will be closed when
