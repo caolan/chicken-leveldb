@@ -325,12 +325,17 @@
         (cons head tail))
       '())))
 
+(define iter-status-ok? car)
+(define iter-status-message cadr)
+
 (define (make-stream it end limit make-value end? next)
   (lazy-seq
     (cond [(eq? limit 0) '()]
           [(iter-valid? it)
            (stream-next it end limit make-value end? next)]
-          [else '()])))
+          [else (let ([s (iter-status it)])
+                  (if (iter-status-ok? s) '()
+                    (abort (iter-status-message s))))])))
 
 (define (init-stream it start)
   (if (eq? start #f)
