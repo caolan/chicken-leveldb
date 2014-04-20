@@ -94,6 +94,14 @@
 
   (test-assert "opening existing db should not error by default"
                (close-db (open-db "testdb")))
+
+  ;; run with valgrind to check call-with-db cleans up
+  (test "call-with-db returns value of proc" "one"
+        (call-with-db "testdb" (lambda (db) (db-get db "1"))))
+
+  (test-error "call-with-db exceptions exposed"
+              (call-with-db "testdb" (lambda (db) (abort "fail"))))
+
   (close-db db))
 
 (test-exit)

@@ -1,6 +1,6 @@
 (module leveldb
   (
-   ;call-with-db
+   call-with-db
    open-db
    close-db
    db-get
@@ -138,16 +138,16 @@
 (define close-db
   (foreign-lambda* void ((DB db)) "delete db;"))
 
-;(define (call-with-db loc proc #!key (create_if_missing #t) (error_if_exists #f))
-;  (let ([db (open-db loc
-;                     create_if_missing: create_if_missing
-;                     error_if_exists: error_if_exists)])
-;    (let ([c (current-exception-handler)])
-;      (begin0
-;          (with-exception-handler
-;           (lambda (ex) (close-db db) (c ex))
-;           (lambda () (proc db)))
-;        (close-db db)))))
+(define (call-with-db loc proc #!key (create_if_missing #t) (error_if_exists #f))
+  (let* ([db (open-db loc
+                      create_if_missing: create_if_missing
+                      error_if_exists: error_if_exists)]
+         [c (current-exception-handler)]
+         [result (with-exception-handler
+                   (lambda (ex) (close-db db) (c ex))
+                   (lambda () (proc db)))])
+      (close-db db)
+      result))
 
 (define c-leveldb-put
   (foreign-lambda* void ((DB db) (slice key) (slice value) (status s) (bool sync))
