@@ -31,7 +31,7 @@ Closes database `db`.
 Opens database at `loc` and calls (proc db). The database will be closed when
 proc returns or raises an exception.
 
-### Read and Write
+### Basic read and write
 
 ```scheme
 (db-get db key)
@@ -58,7 +58,56 @@ set to `#t` to make the write operation not return until the data being
 written has been pushed all the way to persistent storage. See the
 *Synchronous Writes* section for more information.
 
-### Atomic updates
+### Range queries (streams)
+
+```scheme
+(db-stream db thunk #!key start end limit reverse (key #t) (value #t) fillcache)
+```
+
+Allows forward and backward iteration over the keys in alphabetical order.
+Calls `thunk` with a lazy sequence of all key/value pairs from `start` to `end`
+(up to `limit`). This uses the [lazy-seq][3] egg.
+
+* __start__ - the key to start from (need not actually exist), if omitted
+  starts from the first key in the database
+* __end__ - the key to end on (need not actually exist), if omitted ends on
+  the last key in the database
+* __limit__ - stops after `limit` results have been returned
+* __reverse__ - iterates backwards through the keys (reverse
+  iteration may be somewhat slower than forward iteration)
+* __key__ - whether to return the key for each result (default #t)
+* __value__ - whether to return the value for each result (default #t)
+* __fillcache__ - whether to fill leveldb's read cache when reading (turned
+  off by default so the bulk read does not replace most of the cached
+  contents)
+
+When both `key: #t` and `value: #t` (as default) values are returned as a
+list with two items, the `car` being the key and the `cadr` being the
+value. When only `key: #t` or `value: #t` the keys or values are not
+returned as a list but as a string representing the single key or value.
+
+```scheme
+(define (show-data pairs)
+  (lazy-map display pairs))
+
+(db-stream db show-data start: "foo:" end: "foo::" limit: 10)
+```
+
+You can turn the lazy-seq into a list using `lazy-seq->list`, just be
+warned that it will evaluate the entire key range and should be avoided
+unless you know the number of values is small (eg, when using `limit`).
+
+```scheme
+(db-batch db '((put "foo" "1")
+               (put "bar" "2")
+               (put "baz" "3")))
+
+(db-stream db lazy-seq->list limit: 2) ;; => (("foo" "1") ("bar" "2"))
+(db-stream db lazy-seq->list key: #f value: #t) ;; => ("1" "2" "3")
+(db-stream db lazy-seq->list key: #t value: #f) ;; => ("foo" "bar" "baz")
+```
+
+### Atomic updates (batches)
 
 ```scheme
 (db-batch db ops #!key (sync #f))
@@ -114,3 +163,4 @@ amortized across all of the writes in the batch.
 
 [1]: https://code.google.com/p/leveldb/
 [2]: http://leveldb.googlecode.com/svn/trunk/doc/index.html
+[3]: http://wiki.call-cc.org/eggref/4/lazy-seq
