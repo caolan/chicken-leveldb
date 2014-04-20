@@ -1,0 +1,3 @@
+(repo git "git://github.com/caolan/chicken-leveldb.git")
+(uri targz "https://github.com/caolan/chicken-leveldb/tarball/{egg-release}")
+(release "1.0.0")

@@ -8,5 +8,4 @@
   'leveldb
   '("leveldb.so" "leveldb.import.so" "leveldb-static.o")
   '((version "3.5.3")
-    (static "leveldb-static.o")
-    (documentation "leveldb.html" "egg.jpg")))
+    (static "leveldb-static.o")))
