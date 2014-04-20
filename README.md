@@ -58,6 +58,33 @@ set to `#t` to make the write operation not return until the data being
 written has been pushed all the way to persistent storage. See the
 *Synchronous Writes* section for more information.
 
+### Atomic updates (batches)
+
+```scheme
+(db-batch db ops #!key (sync #f))
+```
+
+When making multiple changes that rely on each other you can apply a batch
+of operations atomically using `db-batch`. The `ops` argument is a list of
+operations which will be applied **in order** (meaning you can create then
+later delete a value in the same batch, for example).
+
+```scheme
+(define myops '((put "abc" "123")
+                (put "def" "456")
+                (delete "abc")))
+
+;; apply all operations in myops
+(db-batch db myops)
+```
+
+The first item in an operation should be the symbol `put` or `delete`, any
+other value will give an error. The next item is the key and in the case of
+`put` the third item is the value.
+
+Apart from its atomicity benefits, `db-batch` may also be used to speed up
+bulk updates by placing lots of individual mutations into the same batch.
+
 ### Range queries (streams)
 
 ```scheme
@@ -106,33 +133,6 @@ unless you know the number of values is small (eg, when using `limit`).
 (db-stream db lazy-seq->list key: #f value: #t) ;; => ("1" "2" "3")
 (db-stream db lazy-seq->list key: #t value: #f) ;; => ("foo" "bar" "baz")
 ```
-
-### Atomic updates (batches)
-
-```scheme
-(db-batch db ops #!key (sync #f))
-```
-
-When making multiple changes that rely on each other you can apply a batch
-of operations atomically using `db-batch`. The `ops` argument is a list of
-operations which will be applied **in order** (meaning you can create then
-later delete a value in the same batch, for example).
-
-```scheme
-(define myops '((put "abc" "123")
-                (put "def" "456")
-                (delete "abc")))
-
-;; apply all operations in myops
-(db-batch db myops)
-```
-
-The first item in an operation should be the symbol `put` or `delete`, any
-other value will give an error. The next item is the key and in the case of
-`put` the third item is the value.
-
-Apart from its atomicity benefits, `db-batch` may also be used to speed up
-bulk updates by placing lots of individual mutations into the same batch.
 
 ### Synchronous Writes
 
