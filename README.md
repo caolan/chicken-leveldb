@@ -3,6 +3,44 @@
 Bindings to [LevelDB][1], a fast and lightweight key/value database library by
 Google.
 
+## Examples
+
+### Basic operation
+
+```scheme
+(use leveldb)
+
+(define db (open-db "./example"))
+
+(db-put db "hello" "world")
+(display (db-get db "hello")) ;; => world
+(db-delete db "hello")
+
+(close-db db)
+```
+
+### Batches and ranges
+
+```scheme
+(use leveldb lazy-seq)
+
+(define operations
+  '((put "name:123" "jane")
+    (put "name:456" "joe")))
+
+(define (print-names pairs)
+  (lazy-each print pairs))
+
+(call-with-db "./example"
+  (lambda (db)
+    (db-batch db operations)
+    (db-stream db print-names start: "name:" end: "name::")))
+
+;; prints
+;; => (name:123 jane)
+;; => (name:456 joe)
+```
+
 ## API
 
 ### Open and close
