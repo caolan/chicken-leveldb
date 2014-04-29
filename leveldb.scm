@@ -11,7 +11,7 @@
    )
 
 (import scheme chicken foreign)
-(use coops lazy-seq lolevel)
+(use coops srfi-13 lazy-seq lolevel)
 
 (foreign-declare "#include <iostream>")
 (foreign-declare "#include \"leveldb/db.h\"")
@@ -112,13 +112,30 @@
 (define delete-status
   (foreign-lambda* void ((status s)) "delete s;"))
 
+(define (make-leveldb-condition subtype msg)
+  (make-composite-condition
+    (make-property-condition 'exn 'message msg)
+    (make-property-condition 'leveldb)
+    (make-property-condition subtype)))
+
+(define (status-subtype msg)
+  (cond
+    [(string-prefix? "NotFound: " msg) 'not-found]
+    [(string-prefix? "Corruption: " msg) 'corruption]
+    [(string-prefix? "Not implemented: " msg) 'not-implemented]
+    [(string-prefix? "Invalid argument: " msg) 'invalid-argument]
+    [(string-prefix? "IO error: " msg) 'io-error]
+    [else 'error]))
+
+(define (status->condition msg)
+  (make-leveldb-condition (status-subtype msg) msg))
 
 (define (check-status s)
   (if (status-ok? s)
     (begin (delete-status s) #t)
     (let ([msg (status-message s)])
       (delete-status s)
-      (abort msg))))
+      (abort (status->condition msg)))))
 
 (define c-leveldb-open
   (foreign-lambda* DB ((c-string loc) (status s) (bool create) (bool exists))
