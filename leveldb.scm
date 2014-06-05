@@ -1,5 +1,7 @@
 (module leveldb
   (
+   make-level
+   level
    call-with-db
    open-db
    close-db
@@ -11,7 +13,137 @@
    )
 
 (import scheme chicken foreign)
-(use coops srfi-13 lazy-seq lolevel)
+(use interfaces records coops srfi-13 lazy-seq lolevel)
+
+(define level (make-record-type 'level '(implementation resource)))
+(define level? (record-predicate level))
+(define make-level (record-constructor level))
+(define level-resource (record-accessor level 'resource))
+(define level-implementation (record-accessor level 'implementation))
+
+(define (close-db db)
+  ((close (level-implementation db)) (level-resource db)))
+
+(define (db-get db key)
+  ((get (level-implementation db)) (level-resource db) key))
+
+(define (db-put db key value #!key (sync #f))
+  ((put (level-implementation db)) (level-resource db) key value sync: sync))
+
+(define (db-delete db key #!key (sync #f))
+  ((delete (level-implementation db)) (level-resource db) key sync: sync))
+
+(define (db-batch db ops #!key (sync #f))
+  ((batch (level-implementation db)) (level-resource db) ops sync: sync))
+
+(define (db-stream db
+                   thunk
+                   #!key
+                   start
+                   end
+                   limit
+                   reverse
+                   (key #t)
+                   (value #t)
+                   fillcache)
+  ((stream (level-implementation db))
+   (level-resource db)
+   thunk
+   start: start
+   end: end
+   limit: limit
+   reverse: reverse
+   key: key
+   value: value
+   fillcache: fillcache))
+
+(interface level-api
+  (define (close db))
+  (define (get db key))
+  (define (put db key value #!key (sync #f)))
+  (define (delete db key #!key (sync #f)))
+  (define (batch db ops #!key (sync #f)))
+  (define (stream db
+                  thunk
+                  #!key
+                  start
+                  end
+                  limit
+                  reverse
+                  (key #t)
+                  (value #t)
+                  fillcache)))
+
+
+;; Basic implementation of LevelDB interface, using libleveldb
+(define leveldb (implementation level-api
+
+    (define close
+      (foreign-lambda* void ((DB db)) "delete db;"))
+
+    (define (get db key)
+      (let* ([keystr (string->slice key)]
+             [ret (make-stdstr)]
+             [status (make-status)]
+             [void (c-leveldb-get db keystr ret status)]
+             [result (stdstr->string ret)])
+        (delete-slice keystr)
+        (delete-stdstr ret)
+        (check-status status)
+        result))
+
+    (define (put db key value #!key (sync #f))
+      (let ([keystr (string->slice key)]
+            [valstr (string->slice value)]
+            [status (make-status)])
+        (c-leveldb-put db keystr valstr status sync)
+        (delete-slice keystr)
+        (delete-slice valstr)
+        (check-status status)))
+
+    (define (delete db key #!key (sync #f))
+      (let* ([keystr (string->slice key)]
+             [status (make-status)]
+             [void (c-leveldb-del db keystr status sync)])
+        (delete-slice keystr)
+        (check-status status)))
+
+    (define (stream db thunk
+                       #!key
+                       start
+                       end
+                       limit
+                       reverse
+                       (key #t)
+                       (value #t)
+                       fillcache)
+      (let* ([it (open-iterator db fillcache)]
+             [void (init-stream it start)]
+             [seq (make-stream it end limit
+                               (make-stream-value key value)
+                               (stream-end? reverse)
+                               (if reverse iter-prev! iter-next!))]
+             [result (thunk seq)])
+          (close-iterator it)
+          result))))
+
+
+(define (open-db loc #!key (create #t) (exists #t))
+  (let* ([status (make-status)]
+         [db (c-leveldb-open loc status create exists)])
+    (check-status status)
+    (make-level leveldb db)))
+
+(define (call-with-db loc proc #!key (create #t) (exists #t))
+  (let* ([db (open-db loc create: create exists: exists)]
+         [c (current-exception-handler)]
+         [result (with-exception-handler
+                   (lambda (ex) (close-db db) (c ex))
+                   (lambda () (proc db)))])
+      (close-db db)
+      result))
+
+
 
 (foreign-declare "#include <iostream>")
 (foreign-declare "#include \"leveldb/db.h\"")
@@ -146,66 +278,21 @@
      *s = leveldb::DB::Open(options, loc, &db);
      C_return(db);"))
 
-(define (open-db loc #!key (create #t) (exists #t))
-  (let* ([status (make-status)]
-         [db (c-leveldb-open loc status create exists)])
-    (check-status status)
-    db))
-
-(define close-db
-  (foreign-lambda* void ((DB db)) "delete db;"))
-
-(define (call-with-db loc proc #!key (create #t) (exists #t))
-  (let* ([db (open-db loc create: create exists: exists)]
-         [c (current-exception-handler)]
-         [result (with-exception-handler
-                   (lambda (ex) (close-db db) (c ex))
-                   (lambda () (proc db)))])
-      (close-db db)
-      result))
-
 (define c-leveldb-put
   (foreign-lambda* void ((DB db) (slice key) (slice value) (status s) (bool sync))
     "leveldb::WriteOptions write_options;
      write_options.sync = sync;
      *s = db->Put(write_options, *key, *value);"))
 
-(define (db-put db key value #!key (sync #f))
-  (let ([keystr (string->slice key)]
-        [valstr (string->slice value)]
-        [status (make-status)])
-    (c-leveldb-put db keystr valstr status sync)
-    (delete-slice keystr)
-    (delete-slice valstr)
-    (check-status status)))
-
 (define c-leveldb-get
   (foreign-lambda* void ((DB db) (slice key) (stdstr ret) (status s))
     "*s = db->Get(leveldb::ReadOptions(), *key, ret);"))
-
-(define (db-get db key)
-  (let* ([keystr (string->slice key)]
-         [ret (make-stdstr)]
-         [status (make-status)]
-         [void (c-leveldb-get db keystr ret status)]
-         [result (stdstr->string ret)])
-    (delete-slice keystr)
-    (delete-stdstr ret)
-    (check-status status)
-    result))
 
 (define c-leveldb-del
   (foreign-lambda* void ((DB db) (slice key) (status s) (bool sync))
     "leveldb::WriteOptions write_options;
      write_options.sync = sync;
      *s = db->Delete(write_options, *key);"))
-
-(define (db-delete db key #!key (sync #f))
-  (let* ([keystr (string->slice key)]
-         [status (make-status)]
-         [void (c-leveldb-del db keystr status sync)])
-    (delete-slice keystr)
-    (check-status status)))
 
 (define-class <batch> () ((this '())))
 (define-foreign-type batch (instance "leveldb::WriteBatch" <batch>))
@@ -361,16 +448,4 @@
 
 (define (stream-end? reverse)
   (let ([compare (if reverse string<? string>?)])
-    (lambda (end k) (and end (compare k end)))))
-
-(define (db-stream db thunk
-                   #!key start end limit reverse (key #t) (value #t) fillcache)
-  (let* ([it (open-iterator db fillcache)]
-         [void (init-stream it start)]
-         [seq (make-stream it end limit
-                           (make-stream-value key value)
-                           (stream-end? reverse)
-                           (if reverse iter-prev! iter-next!))]
-         [result (thunk seq)])
-      (close-iterator it)
-      result)))
+    (lambda (end k) (and end (compare k end))))))
