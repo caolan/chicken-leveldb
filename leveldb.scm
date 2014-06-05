@@ -1,85 +1,17 @@
 (module leveldb
   (
-   make-level
-   level
+   leveldb
    call-with-db
    open-db
    close-db
-   db-get
-   db-put
-   db-delete
-   db-batch
-   db-stream
    )
 
 (import scheme chicken foreign)
-(use interfaces records coops srfi-13 lazy-seq lolevel)
-
-(define level (make-record-type 'level '(implementation resource)))
-(define level? (record-predicate level))
-(define make-level (record-constructor level))
-(define level-resource (record-accessor level 'resource))
-(define level-implementation (record-accessor level 'implementation))
-
-(define (close-db db)
-  ((close (level-implementation db)) (level-resource db)))
-
-(define (db-get db key)
-  ((get (level-implementation db)) (level-resource db) key))
-
-(define (db-put db key value #!key (sync #f))
-  ((put (level-implementation db)) (level-resource db) key value sync: sync))
-
-(define (db-delete db key #!key (sync #f))
-  ((delete (level-implementation db)) (level-resource db) key sync: sync))
-
-(define (db-batch db ops #!key (sync #f))
-  ((batch (level-implementation db)) (level-resource db) ops sync: sync))
-
-(define (db-stream db
-                   thunk
-                   #!key
-                   start
-                   end
-                   limit
-                   reverse
-                   (key #t)
-                   (value #t)
-                   fillcache)
-  ((stream (level-implementation db))
-   (level-resource db)
-   thunk
-   start: start
-   end: end
-   limit: limit
-   reverse: reverse
-   key: key
-   value: value
-   fillcache: fillcache))
-
-(interface level-api
-  (define (close db))
-  (define (get db key))
-  (define (put db key value #!key (sync #f)))
-  (define (delete db key #!key (sync #f)))
-  (define (batch db ops #!key (sync #f)))
-  (define (stream db
-                  thunk
-                  #!key
-                  start
-                  end
-                  limit
-                  reverse
-                  (key #t)
-                  (value #t)
-                  fillcache)))
-
+(use level interfaces records coops srfi-13 lazy-seq lolevel)
 
 ;; Basic implementation of LevelDB interface, using libleveldb
-(define leveldb (implementation level-api
-
-    (define close
-      (foreign-lambda* void ((DB db)) "delete db;"))
+(define leveldb
+  (implementation level-api
 
     (define (get db key)
       (let* ([keystr (string->slice key)]
@@ -108,6 +40,14 @@
         (delete-slice keystr)
         (check-status status)))
 
+    (define (batch db ops #!key (sync #f))
+      (let ([batch (make-batch)]
+            [status (make-status)])
+        (fill-batch batch ops)
+        (c-leveldb-write-batch db batch status sync)
+        (delete-batch batch)
+        (check-status status)))
+
     (define (stream db thunk
                        #!key
                        start
@@ -128,6 +68,11 @@
           result))))
 
 
+(define (close-db db)
+  (if (level? db)
+    (close-db (level-resource db))
+    (foreign-lambda* void ((DB db)) "delete db;")))
+
 (define (open-db loc #!key (create #t) (exists #t))
   (let* ([status (make-status)]
          [db (c-leveldb-open loc status create exists)])
@@ -144,19 +89,15 @@
       result))
 
 
-
 (foreign-declare "#include <iostream>")
 (foreign-declare "#include \"leveldb/db.h\"")
 (foreign-declare "#include \"leveldb/write_batch.h\"")
 
-
 (define-class <db> () ((this '())))
 (define-foreign-type DB (instance "leveldb::DB" <db>))
 
-
 (define-class <options> () ((this '())))
 (define-foreign-type options (instance "leveldb::Options" <options>))
-
 
 (define-class <stdstr> () ((this '())))
 (define-foreign-type stdstr (instance "std::string" <stdstr>))
@@ -225,7 +166,6 @@
   (foreign-lambda* slice ()
     "leveldb::Slice *x = new leveldb::Slice();
      C_return(x);"))
-
 
 (define-class <status> () ((this '())))
 (define-foreign-type status (instance "leveldb::Status" <status>))
@@ -341,14 +281,6 @@
             [else
               (abort (sprintf "Unknown type for batch operation: ~S" type))])
       (fill-batch batch (cdr ops)))))
-
-(define (db-batch db ops #!key (sync #f))
-  (let ([batch (make-batch)]
-        [status (make-status)])
-    (fill-batch batch ops)
-    (c-leveldb-write-batch db batch status sync)
-    (delete-batch batch)
-    (check-status status)))
 
 (define-class <iter> () ((this '())))
 (define-foreign-type iter (instance "leveldb::Iterator" <iter>))

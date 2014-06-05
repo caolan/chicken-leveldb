@@ -1,4 +1,4 @@
-(use leveldb posix test lazy-seq)
+(use level leveldb posix test lazy-seq)
 
 ; attempting to open db that doesn't exist
 (if (directory? "testdb")
