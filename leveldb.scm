@@ -58,9 +58,10 @@
                        (value #t)
                        fillcache)
       (let* ([it (open-iterator db fillcache)]
-             [void (init-stream it start)]
+             [void (init-stream it start reverse)]
              [seq (make-stream it end limit
                                (make-stream-value key value)
+                               (stream-start? start reverse)
                                (stream-end? reverse)
                                (if reverse iter-prev! iter-next!))]
              [result (thunk seq)])
@@ -306,6 +307,9 @@
 (define iter-seek-first!
   (foreign-lambda* void ((iter it)) "it->SeekToFirst();"))
 
+(define iter-seek-last!
+  (foreign-lambda* void ((iter it)) "it->SeekToLast();"))
+
 (define iter-valid?
   (foreign-lambda* bool ((iter it)) "C_return(it->Valid());"))
 
@@ -351,32 +355,41 @@
           [key (or k (iter-key it))]
           [else '()])))
 
-(define (stream-next it end limit make-value end? next)
-  (let* ([k (and end (iter-key it))]
+(define (stream-next it end limit make-value start? end? next)
+  (let* ([k (iter-key it)]
          [nextlimit (and limit (- limit 1))])
     (if (not (end? end k))
-      (let* ([head (make-value k it)]
-             [void (next it)]
-             [tail (make-stream it end nextlimit make-value end? next)])
-        (cons head tail))
+      (let ([head (make-value k it)]
+            [void (next it)]
+            [tail (make-stream it end nextlimit make-value start? end? next)])
+        (if (start? k)
+          (cons head tail)
+          tail))
       '())))
 
 (define iter-status-ok? car)
 (define iter-status-message cadr)
 
-(define (make-stream it end limit make-value end? next)
+(define (make-stream it end limit make-value start? end? next)
   (lazy-seq
     (cond [(eq? limit 0) '()]
           [(iter-valid? it)
-           (stream-next it end limit make-value end? next)]
+           (stream-next it end limit make-value start? end? next)]
           [else (let ([s (iter-status it)])
                   (if (iter-status-ok? s) '()
                     (abort (iter-status-message s))))])))
 
-(define (init-stream it start)
+(define (init-stream it start reverse)
   (if (eq? start #f)
-    (iter-seek-first! it)
+    ((if reverse iter-seek-last! iter-seek-first!) it)
     (iter-seek! it start)))
+
+(define (stream-start? start reverse)
+  (if start
+    (if reverse
+      (lambda (k) (string<=? k start))
+      (lambda (k) (string>=? k start)))
+    (lambda (x) #t)))
 
 (define (stream-end? reverse)
   (let ([compare (if reverse string<? string>?)])

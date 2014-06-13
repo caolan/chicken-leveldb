@@ -91,6 +91,21 @@
         '(("3" "three") ("2" "two") ("1" "one"))
         (db-stream db lazy-seq->list reverse: #t start: "3" limit: 3))
 
+  (db-batch db '((put "four\x00zzz" "000")
+                 (put "four\x00def" "456")
+                 (put "four\x00abc" "123")
+                 (put "three\x00one" "foo")
+                 (put "three\x00two" "bar")))
+  (test "stream reverse with start, end and keys including nul"
+        '(("four\x00zzz" "000")
+          ("four\x00def" "456")
+          ("four\x00abc" "123"))
+        (db-stream db
+                   lazy-seq->list
+                   reverse: #t
+                   start: "four\x00\xff"
+                   end: "four\x00"))
+
   (test-error "opening existing db should error when exists: #f"
               (open-db "testdb" exists: #f))
 
