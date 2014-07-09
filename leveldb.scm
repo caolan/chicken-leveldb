@@ -70,9 +70,12 @@
 
 
 (define (close-db db)
+  (printf "close-db ~S~n" db)
   (if (level? db)
-    (close-db (level-resource db))
-    (foreign-lambda* void ((DB db)) "delete db;")))
+    (let ([resource (level-resource db)])
+      (set-level-resource! db #f)
+      (close-db resource))
+    ((foreign-lambda* void ((DB db)) "printf(\"delete: %p\\n\", db); delete db;") (slot-value db 'this))))
 
 (define (open-db loc #!key (create #t) (exists #t))
   (let* ([status (make-status)]
@@ -81,13 +84,10 @@
     (make-level leveldb db)))
 
 (define (call-with-db loc proc #!key (create #t) (exists #t))
-  (let* ([db (open-db loc create: create exists: exists)]
-         [c (current-exception-handler)]
-         [result (with-exception-handler
-                   (lambda (ex) (close-db db) (c ex))
-                   (lambda () (proc db)))])
-      (close-db db)
-      result))
+  (let ([db #f])
+    (dynamic-wind (lambda () (set! db (open-db loc create: create exists: exists)))
+                  (lambda () (proc db))
+                  (lambda () (close-db db)))))
 
 
 (foreign-declare "#include <iostream>")
