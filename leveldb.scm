@@ -48,34 +48,32 @@
         (delete-batch batch)
         (check-status status)))
 
-    (define (stream db thunk
-                       #!key
-                       start
-                       end
-                       limit
-                       reverse
-                       (key #t)
-                       (value #t)
-                       fillcache)
-      (let* ([it (open-iterator db fillcache)]
-             [void (init-stream it start reverse)]
-             [seq (make-stream it end limit
-                               (make-stream-value key value)
-                               (stream-start? start reverse)
-                               (stream-end? reverse)
-                               (if reverse iter-prev! iter-next!))]
-             [result (thunk seq)])
-          (close-iterator it)
-          result))))
+    (define (stream db
+                    #!key
+                    start
+                    end
+                    limit
+                    reverse
+                    (key #t)
+                    (value #t)
+                    fillcache)
+      (let* ([it (open-iterator db fillcache)])
+        (init-stream it start reverse)
+        (make-stream it end limit
+                     (make-stream-value key value)
+                     (stream-start? start reverse)
+                     (stream-end? reverse)
+                     (if reverse iter-prev! iter-next!))))))
 
 
 (define (close-db db)
-  (printf "close-db ~S~n" db)
   (if (level? db)
-    (let ([resource (level-resource db)])
-      (set-level-resource! db #f)
-      (close-db resource))
-    ((foreign-lambda* void ((DB db)) "printf(\"delete: %p\\n\", db); delete db;") (slot-value db 'this))))
+    (close-db (level-resource db))
+    (begin
+      (map close-iterator (slot-value db 'iterators))
+      (set! (slot-value db 'closed) #t)
+      ((foreign-lambda* void ((DB db)) "delete db;")
+       (slot-value db 'this)))))
 
 (define (open-db loc #!key (create #t) (exists #t))
   (let* ([status (make-status)]
@@ -84,8 +82,8 @@
     (make-level leveldb db)))
 
 (define (call-with-db loc proc #!key (create #t) (exists #t))
-  (let ([db #f])
-    (dynamic-wind (lambda () (set! db (open-db loc create: create exists: exists)))
+  (let ([db (open-db loc create: create exists: exists)])
+    (dynamic-wind (lambda () #f)
                   (lambda () (proc db))
                   (lambda () (close-db db)))))
 
@@ -94,8 +92,11 @@
 (foreign-declare "#include \"leveldb/db.h\"")
 (foreign-declare "#include \"leveldb/write_batch.h\"")
 
-(define-class <db> () ((this '())))
+(define-class <db> () ((this '()) (closed #f) (iterators '()))
 (define-foreign-type DB (instance "leveldb::DB" <db>))
+
+(define-class <iter> () ((this '()) (db #f)))
+(define-foreign-type iter (instance "leveldb::Iterator" <iter>))
 
 (define-class <options> () ((this '())))
 (define-foreign-type options (instance "leveldb::Options" <options>))
@@ -283,15 +284,20 @@
               (abort (sprintf "Unknown type for batch operation: ~S" type))])
       (fill-batch batch (cdr ops)))))
 
-(define-class <iter> () ((this '())))
-(define-foreign-type iter (instance "leveldb::Iterator" <iter>))
-
-(define open-iterator
+(define c-open-iterator
   (foreign-lambda* iter ((DB db) (bool fillcache))
     "leveldb::ReadOptions options;
      options.fill_cache = fillcache;
      leveldb::Iterator* x = db->NewIterator(options);
      C_return(x);"))
+
+(define (open-iterator db fillcache)
+  (let ([it (c-open-iterator db fillcache)])
+    ;; TODO: test if db has been closed
+    (set! (slot-value it 'db) db)
+    (set! (slot-value db 'iterators) (cons (slot-value db 'iterators) it))
+    (set-finalizer! it close-iterator)
+    it))
 
 (define iter-next! (foreign-lambda* void ((iter it)) "it->Next();"))
 (define iter-prev! (foreign-lambda* void ((iter it)) "it->Prev();"))
@@ -345,8 +351,20 @@
     (delete-status status)
     (list ok msg)))
 
-(define close-iterator
-  (foreign-lambda* void ((iter it)) "delete it;"))
+(define c-close-iterator
+  (foreign-lambda* void ((iter it))
+    "printf(\"delete iterator: %p\\n\"); delete it;"))
+
+(define (db-closed? db)
+  (slot-value db 'closed))
+
+(define (close-iterator it)
+  (if (db-closed? (slot-value it 'db))
+    (printf "DB already closed, not deleting iterator~n")
+    (set! (slot-value db 'iterators)
+      (filter (lambda (x) (eq? it x))
+              (slot-value db 'iterators)))
+    (c-close-iterator it)))
 
 (define (make-stream-value key value)
   (lambda (k it)

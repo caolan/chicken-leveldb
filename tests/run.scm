@@ -41,55 +41,51 @@
 
   (test "stream from 2 limit 1"
         '(("2" "two"))
-        (db-stream db lazy-seq->list start: "2" limit: 1))
+        (lazy-seq->list (db-stream db start: "2" limit: 1)))
 
   (test "stream from 2 limit 2"
         '(("2" "two") ("3" "three"))
-        (db-stream db lazy-seq->list start: "2" limit: 2))
+        (lazy-seq->list (db-stream db start: "2" limit: 2)))
 
   (test "stream from start limit 2"
         '(("1" "one") ("2" "two"))
-        (db-stream db lazy-seq->list limit: 2))
+        (lazy-seq->list (db-stream db limit: 2)))
 
   (test "stream from start no limit"
         '(("1" "one") ("2" "two") ("3" "three"))
-        (db-stream db lazy-seq->list))
+        (lazy-seq->list (db-stream db)))
 
   (test "stream from start no limit end 2"
         '(("1" "one") ("2" "two"))
-        (db-stream db lazy-seq->list end: "2"))
+        (lazy-seq->list (db-stream db end: "2")))
 
   (test "stream from start 2 limit 2 end 2"
         '(("2" "two"))
-        (db-stream db lazy-seq->list start: "2" end: "2" limit: 2))
+        (lazy-seq->list (db-stream db start: "2" end: "2" limit: 2)))
 
   (test "stream from start 2 limit 1 end 3"
         '(("2" "two"))
-        (db-stream db lazy-seq->list start: "2" end: "3" limit: 1))
+        (lazy-seq->list (db-stream db start: "2" end: "3" limit: 1)))
 
   (test "stream keys from start 1 end 3"
         '("1" "2" "3")
-        (db-stream db lazy-seq->list
-                   start: "1"
-                   end: "3"
-                   key: #t
-                   value: #f))
+        (lazy-seq->list
+          (db-stream db start: "1" end: "3" key: #t value: #f)))
 
   (test "stream values from start 1 end 3"
         '("one" "two" "three")
-        (db-stream db lazy-seq->list
-                   start: "1"
-                   end: "3"
-                   key: #f
-                   value: #t))
+        (lazy-seq->list
+          (db-stream db start: "1" end: "3" key: #f value: #t)))
 
   (test "stream reverse start 3 end 2"
         '(("3" "three") ("2" "two"))
-        (db-stream db lazy-seq->list reverse: #t start: "3" end: "2"))
+        (lazy-seq->list
+          (db-stream db reverse: #t start: "3" end: "2")))
 
   (test "stream reverse start 3 limit 3"
         '(("3" "three") ("2" "two") ("1" "one"))
-        (db-stream db lazy-seq->list reverse: #t start: "3" limit: 3))
+        (lazy-seq->list
+          (db-stream db reverse: #t start: "3" limit: 3)))
 
   (db-batch db '((put "four\x00zzz" "000")
                  (put "four\x00def" "456")
@@ -100,11 +96,8 @@
         '(("four\x00zzz" "000")
           ("four\x00def" "456")
           ("four\x00abc" "123"))
-        (db-stream db
-                   lazy-seq->list
-                   reverse: #t
-                   start: "four\x00\xff"
-                   end: "four\x00"))
+        (lazy-seq->list
+          (db-stream db reverse: #t start: "four\x00\xff" end: "four\x00")))
 
   (test-error "opening existing db should error when exists: #f"
               (open-db "testdb" exists: #f))
@@ -118,6 +111,43 @@
 
   (test-error "call-with-db exceptions exposed"
               (call-with-db "testdb" (lambda (db) (abort "fail"))))
+
+  (close-db db))
+
+(test-group "throw some random data at it"
+  ; attempting to open db that doesn't exist
+  (if (directory? "testdb")
+    (delete-directory "testdb" #t))
+
+  (define db (open-db "testdb"))
+
+  (define data (make-hash-table))
+
+  (define (random-string)
+    (number->string (random 1000000000)))
+
+  (define (make-data n)
+    (if (= 0 n) '()
+      (cons (list (random-string) (random-string))
+            (make-data (- n 1)))))
+
+  (define (insert-data n)
+    (let ([xs (make-data n)])
+      (map (lambda (x) (hash-table-set! data (car x) (cadr x))) xs)
+      (db-batch db (map (lambda (x) (cons 'put x)) xs))))
+
+  (insert-data 1000)
+  (insert-data 1000)
+  (insert-data 1000)
+  (insert-data 1000)
+  (insert-data 1000)
+  (insert-data 1000)
+  (insert-data 1000)
+  (insert-data 1000)
+
+  (test "random inserts and stream results check"
+        (sort (hash-table-keys data) string<?)
+        (lazy-seq->list (db-stream db key: #t value: #f)))
 
   (close-db db))
 
