@@ -7,7 +7,7 @@
    )
 
 (import scheme chicken foreign)
-(use level interfaces records coops srfi-13 lazy-seq lolevel)
+(use srfi-1 level interfaces records coops srfi-13 lazy-seq lolevel)
 
 ;; Basic implementation of LevelDB interface, using libleveldb
 (define leveldb
@@ -92,7 +92,7 @@
 (foreign-declare "#include \"leveldb/db.h\"")
 (foreign-declare "#include \"leveldb/write_batch.h\"")
 
-(define-class <db> () ((this '()) (closed #f) (iterators '()))
+(define-class <db> () ((this '()) (closed #f) (iterators '())))
 (define-foreign-type DB (instance "leveldb::DB" <db>))
 
 (define-class <iter> () ((this '()) (db #f)))
@@ -295,7 +295,7 @@
   (let ([it (c-open-iterator db fillcache)])
     ;; TODO: test if db has been closed
     (set! (slot-value it 'db) db)
-    (set! (slot-value db 'iterators) (cons (slot-value db 'iterators) it))
+    (set! (slot-value db 'iterators) (cons it (slot-value db 'iterators)))
     (set-finalizer! it close-iterator)
     it))
 
@@ -352,19 +352,20 @@
     (list ok msg)))
 
 (define c-close-iterator
-  (foreign-lambda* void ((iter it))
-    "printf(\"delete iterator: %p\\n\"); delete it;"))
+  (foreign-lambda* void ((iter it)) "delete it;"))
 
 (define (db-closed? db)
   (slot-value db 'closed))
 
 (define (close-iterator it)
-  (if (db-closed? (slot-value it 'db))
-    (printf "DB already closed, not deleting iterator~n")
-    (set! (slot-value db 'iterators)
-      (filter (lambda (x) (eq? it x))
-              (slot-value db 'iterators)))
-    (c-close-iterator it)))
+  (let ([db (slot-value it 'db)])
+    (if (db-closed? db)
+      #f ;; DB already closed, not deleting iterator
+      (begin
+        (set! (slot-value db 'iterators)
+          (filter (lambda (x) (eq? it x))
+                  (slot-value db 'iterators)))
+        (c-close-iterator it)))))
 
 (define (make-stream-value key value)
   (lambda (k it)
