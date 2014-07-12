@@ -114,41 +114,43 @@
 
   (close-db db))
 
-;(test-group "throw some random data at it"
-;  ; attempting to open db that doesn't exist
-;  (if (directory? "testdb")
-;    (delete-directory "testdb" #t))
-;
-;  (define db (open-db "testdb"))
-;
-;  (define data (make-hash-table))
-;
-;  (define (random-string)
-;    (number->string (random 1000000000)))
-;
-;  (define (make-data n)
-;    (if (= 0 n) '()
-;      (cons (list (random-string) (random-string))
-;            (make-data (- n 1)))))
-;
-;  (define (insert-data n)
-;    (let ([xs (make-data n)])
-;      (map (lambda (x) (hash-table-set! data (car x) (cadr x))) xs)
-;      (db-batch db (map (lambda (x) (cons 'put x)) xs))))
-;
-;  (insert-data 1000)
-;  (insert-data 1000)
-;  (insert-data 1000)
-;  (insert-data 1000)
-;  (insert-data 1000)
-;  (insert-data 1000)
-;  (insert-data 1000)
-;  (insert-data 1000)
-;
-;  (test "random inserts and stream results check"
-;        (sort (hash-table-keys data) string<?)
-;        (lazy-seq->list (db-stream db key: #t value: #f)))
-;
-;  (close-db db))
+(test-group "throw some random data at it"
+  ; attempting to open db that doesn't exist
+  (if (directory? "testdb")
+    (delete-directory "testdb" #t))
+
+  (define db (open-db "testdb"))
+
+  (define data (make-hash-table))
+
+  (define (random-string)
+    (number->string (random 1000000000)))
+
+  (define (make-data n)
+    (if (= 0 n) '()
+      (cons (list (random-string) (random-string))
+            (make-data (- n 1)))))
+
+  (define (insert-data n)
+    (let ([xs (make-data n)])
+      (map (lambda (x) (hash-table-set! data (car x) (cadr x))) xs)
+      (db-batch db (map (lambda (x) (cons 'put x)) xs))))
+
+  (insert-data 1000)
+  (insert-data 1000)
+  (insert-data 1000)
+  (insert-data 1000)
+  (insert-data 1000)
+  (insert-data 1000)
+  (insert-data 1000)
+  (insert-data 1000)
+  (insert-data 1000)
+  (insert-data 1000)
+
+  (test "random inserts and stream results check"
+        (sort (hash-table-keys data) string<?)
+        (lazy-seq->list (db-stream db key: #t value: #f)))
+
+  (close-db db))
 
 (test-exit)
