@@ -34,7 +34,7 @@ Google.
 (call-with-db "./example"
   (lambda (db)
     (db-batch db operations)
-    (db-stream db print-names start: "name:" end: "name::")))
+    (print-names (db-stream db start: "name:" end: "name::"))))
 
 ;; prints
 ;; => (name:123 jane)
@@ -126,11 +126,11 @@ bulk updates by placing lots of individual mutations into the same batch.
 ### Range queries (streams)
 
 ```scheme
-(db-stream db thunk #!key start end limit reverse (key #t) (value #t) fillcache)
+(db-stream db #!key start end limit reverse (key #t) (value #t) fillcache)
 ```
 
 Allows forward and backward iteration over the keys in alphabetical order.
-Calls `thunk` with a lazy sequence of all key/value pairs from `start` to `end`
+Returns a lazy sequence of all key/value pairs from `start` to `end`
 (up to `limit`). This uses the [lazy-seq][3] egg.
 
 * __start__ - the key to start from (need not actually exist), if omitted
@@ -152,10 +152,7 @@ value. When only `key: #t` or `value: #t` the keys or values are not
 returned as a list but as a string representing the single key or value.
 
 ```scheme
-(define (show-data pairs)
-  (lazy-map display pairs))
-
-(db-stream db show-data start: "foo:" end: "foo::" limit: 10)
+(lazy-map display (db-stream db start: "foo:" end: "foo::" limit: 10)))
 ```
 
 You can turn the lazy-seq into a list using `lazy-seq->list`, just be
@@ -167,9 +164,9 @@ unless you know the number of values is small (eg, when using `limit`).
                (put "bar" "2")
                (put "baz" "3")))
 
-(db-stream db lazy-seq->list limit: 2) ;; => (("foo" "1") ("bar" "2"))
-(db-stream db lazy-seq->list key: #f value: #t) ;; => ("1" "2" "3")
-(db-stream db lazy-seq->list key: #t value: #f) ;; => ("foo" "bar" "baz")
+(lazy-seq->list (db-stream db limit: 2)) ;; => (("foo" "1") ("bar" "2"))
+(lazy-seq->list (db-stream db key: #f value: #t)) ;; => ("1" "2" "3")
+(lazy-seq->list (db-stream db key: #t value: #f)) ;; => ("foo" "bar" "baz")
 ```
 
 ### Synchronous Writes
