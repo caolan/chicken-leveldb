@@ -11,6 +11,9 @@
 (import utf8 scheme chicken foreign)
 (use srfi-1 level interfaces records coops srfi-13 lazy-seq lolevel)
 
+;; work-around until #1143 is fixed - https://bugs.call-cc.org/ticket/1143
+(import (rename (only scheme string-length) (string-length byte-string-length)))
+
 ;; Basic implementation of LevelDB interface, using libleveldb
 (define leveldb
   (implementation level-api
