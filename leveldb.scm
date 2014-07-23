@@ -1,3 +1,5 @@
+(require-extension utf8)
+
 (module leveldb
   (
    leveldb
@@ -6,7 +8,7 @@
    close-db
    )
 
-(import scheme chicken foreign)
+(import utf8 scheme chicken foreign)
 (use srfi-1 level interfaces records coops srfi-13 lazy-seq lolevel)
 
 ;; Basic implementation of LevelDB interface, using libleveldb
@@ -121,7 +123,7 @@
      ((integer size) (scheme-pointer data))
      "std::string *x = new std::string((const char*)data, size);
       C_return(x);")
-   (string-length str)
+   (byte-string-length str)
    str))
 
 (define (stdstr->string str)
@@ -154,7 +156,7 @@
   ((foreign-lambda* slice ((integer size) (scheme-pointer data))
      "leveldb::Slice *x = new leveldb::Slice((const char*)data, size);
       C_return(x);")
-   (string-length str)
+   (byte-string-length str)
    str))
 
 (define (slice->string s)
