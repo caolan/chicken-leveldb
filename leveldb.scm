@@ -19,34 +19,22 @@
   (implementation level-api
 
     (define (get db key)
-      (let* ([keystr (string->slice key)]
-             [ret (make-stdstr)]
+      (let* ([ret (make-stdstr)]
              [status (make-status)]
-             [void (c-leveldb-get db keystr ret status)]
+             [void (c-leveldb-get db key ret status)]
              [result (stdstr->string ret)])
-        (delete-slice-data keystr)
-        (delete-slice keystr)
         (delete-stdstr ret)
         (check-status status)
         result))
 
     (define (put db key value #!key (sync #f))
-      (let ([keystr (string->slice key)]
-            [valstr (string->slice value)]
-            [status (make-status)])
-        (c-leveldb-put db keystr valstr status sync)
-        (delete-slice-data keystr)
-        (delete-slice keystr)
-        (delete-slice-data valstr)
-        (delete-slice valstr)
+      (let ([status (make-status)])
+        (c-leveldb-put db key value status sync)
         (check-status status)))
 
     (define (delete db key #!key (sync #f))
-      (let* ([keystr (string->slice key)]
-             [status (make-status)]
-             [void (c-leveldb-del db keystr status sync)])
-        (delete-slice-data keystr)
-        (delete-slice keystr)
+      (let* ([status (make-status)]
+             [void (c-leveldb-del db key status sync)])
         (check-status status)))
 
     (define (batch db ops #!key (sync #f))
@@ -118,7 +106,7 @@
     "C_return(str->data());"))
 
 (define stdstr-size
-  (foreign-lambda* integer ((stdstr  str))
+  (foreign-lambda* integer ((stdstr str))
     "C_return(str->size());"))
 
 (define delete-stdstr
@@ -161,17 +149,6 @@
 
 (define delete-slice-data
   (foreign-lambda* void ((slice s)) "delete s->data();"))
-
-(define (string->slice str)
-  (if (not (string? str))
-    (abort "string->slice expects a string as argument")
-    ((foreign-lambda* slice ((integer size) (scheme-pointer data))
-       "void* cpy = malloc(size);
-        memcpy(cpy, data, size);
-        leveldb::Slice *x = new leveldb::Slice((const char*)cpy, size);
-        C_return(x);")
-     (byte-string-length str)
-     str)))
 
 (define (slice->string s)
   (let* ([size (slice-size s)]
@@ -236,21 +213,42 @@
      *s = leveldb::DB::Open(options, loc, &db);
      C_return(db);"))
 
-(define c-leveldb-put
-  (foreign-lambda* void ((DB db) (slice key) (slice value) (status s) (bool sync))
-    "leveldb::WriteOptions write_options;
-     write_options.sync = sync;
-     *s = db->Put(write_options, *key, *value);"))
+(define (c-leveldb-put db key val status sync)
+  (if (or (not (string? key)) (not (string? val)))
+    (abort "Expected string for key and val arguments")
+    ((foreign-lambda* void
+       ((DB db) (integer keysize) (scheme-pointer key)
+                (integer valsize) (scheme-pointer val) (status s) (bool sync))
+       "leveldb::WriteOptions write_options;
+        write_options.sync = sync;
+        leveldb::Slice* keyslice = new leveldb::Slice((const char*)key, keysize);
+        leveldb::Slice* valslice = new leveldb::Slice((const char*)val, valsize);
+        *s = db->Put(write_options, *keyslice, *valslice);
+        delete keyslice;
+        delete valslice;")
+     db (byte-string-length key) key (byte-string-length val) val status sync)))
 
-(define c-leveldb-get
-  (foreign-lambda* void ((DB db) (slice key) (stdstr ret) (status s))
-    "*s = db->Get(leveldb::ReadOptions(), *key, ret);"))
+(define (c-leveldb-get db key ret status)
+  (if (not (string? key))
+    (abort "Expected string for key argument")
+    ((foreign-lambda* void
+       ((DB db) (integer keysize) (scheme-pointer key) (stdstr ret) (status s))
+       "leveldb::Slice* keyslice = new leveldb::Slice((const char*)key, keysize);
+        *s = db->Get(leveldb::ReadOptions(), *keyslice, ret);
+        delete keyslice;")
+     db (byte-string-length key) key ret status)))
 
-(define c-leveldb-del
-  (foreign-lambda* void ((DB db) (slice key) (status s) (bool sync))
-    "leveldb::WriteOptions write_options;
-     write_options.sync = sync;
-     *s = db->Delete(write_options, *key);"))
+(define (c-leveldb-del db key status sync)
+  (if (not (string? key))
+    (abort "Expected string for key argument")
+    ((foreign-lambda* void
+       ((DB db) (integer keysize) (scheme-pointer key) (status s) (bool sync))
+       "leveldb::WriteOptions write_options;
+        write_options.sync = sync;
+        leveldb::Slice* keyslice = new leveldb::Slice((const char*)key, keysize);
+        *s = db->Delete(write_options, *keyslice);
+        delete keyslice;")
+     db (byte-string-length key) key status sync)))
 
 (define-class <batch> () ((this '())))
 (define-foreign-type batch (instance "leveldb::WriteBatch" <batch>))
@@ -263,28 +261,29 @@
 (define delete-batch
   (foreign-lambda* void ((batch b)) "delete b;"))
 
-(define c-leveldb-batch-put
-  (foreign-lambda* void ((batch batch) (slice key) (slice value))
-    "batch->Put(*key, *value);"))
+(define (c-leveldb-batch-put batch key value)
+  (if (or (not (string? key)) (not (string? value)))
+    (abort "Expected strings for key and value arguments")
+    ((foreign-lambda* void
+       ((batch batch) (integer keysize) (scheme-pointer key)
+                      (integer valsize) (scheme-pointer val))
+       "leveldb::Slice* keyslice = new leveldb::Slice((const char*)key, keysize);
+        leveldb::Slice* valslice = new leveldb::Slice((const char*)val, valsize);
+        batch->Put(*keyslice, *valslice);
+        delete keyslice;
+        delete valslice;")
+     batch (byte-string-length key) key
+           (byte-string-length value) value)))
 
-(define (leveldb-batch-put batch key value)
-  (let ([keystr (string->slice key)]
-        [valstr (string->slice value)])
-    (c-leveldb-batch-put batch keystr valstr)
-    (delete-slice-data keystr)
-    (delete-slice keystr)
-    (delete-slice-data valstr)
-    (delete-slice valstr)))
-
-(define c-leveldb-batch-del
-  (foreign-lambda* void ((batch batch) (slice key))
-    "batch->Delete(*key);"))
-
-(define (leveldb-batch-del batch key)
-  (let ([keystr (string->slice key)])
-    (c-leveldb-batch-del batch keystr)
-    (delete-slice-data keystr)
-    (delete-slice keystr)))
+(define (c-leveldb-batch-del batch key)
+  (if (not (string? key))
+    (abort "Expected string for key argument")
+    ((foreign-lambda* void
+       ((batch batch) (integer keysize) (scheme-pointer key))
+       "leveldb::Slice* keyslice = new leveldb::Slice((const char*)key, keysize);
+        batch->Delete(*keyslice);
+        delete keyslice;")
+     batch (byte-string-length key) key)))
 
 (define c-leveldb-write-batch
   (foreign-lambda* void ((DB db) (batch batch) (status s) (bool sync))
@@ -297,8 +296,8 @@
     (let* ([op (car ops)]
            [type (car op)]
            [key (cadr op)])
-      (cond [(eq? 'put type) (leveldb-batch-put batch key (caddr op))]
-            [(eq? 'delete type) (leveldb-batch-del batch key)]
+      (cond [(eq? 'put type) (c-leveldb-batch-put batch key (caddr op))]
+            [(eq? 'delete type) (c-leveldb-batch-del batch key)]
             [else
               (abort (sprintf "Unknown type for batch operation: ~S" type))])
       (fill-batch batch (cdr ops)))))
@@ -321,14 +320,15 @@
 (define iter-next! (foreign-lambda* void ((iter it)) "it->Next();"))
 (define iter-prev! (foreign-lambda* void ((iter it)) "it->Prev();"))
 
-(define c-iter-seek
-  (foreign-lambda* void ((iter it) (slice start)) "it->Seek(*start);"))
-
-(define (iter-seek! iter key)
-  (let ([keyslice (string->slice key)])
-    (c-iter-seek iter (string->slice key))
-    (delete-slice-data keyslice)
-    (delete-slice keyslice)))
+(define (iter-seek! it start)
+  (if (not (string? start))
+    (abort "Expected string for start argument")
+    ((foreign-lambda* void
+       ((iter it) (integer startsize) (scheme-pointer start))
+       "leveldb::Slice* startslice = new leveldb::Slice((const char*)start, startsize);
+        it->Seek(*startslice);
+        delete startslice;")
+     it (byte-string-length start) start)))
 
 (define iter-seek-first!
   (foreign-lambda* void ((iter it)) "it->SeekToFirst();"))
