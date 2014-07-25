@@ -114,7 +114,7 @@
     "C_return(str->data());"))
 
 (define stdstr-size
-  (foreign-lambda* integer ((stdstr  str))
+  (foreign-lambda* integer ((stdstr str))
     "C_return(str->size());"))
 
 (define delete-stdstr
@@ -162,17 +162,13 @@
    (byte-string-length str)
    str))
 
-(define (slice->string s)
+(define (slice->string! s)
   (let* ([size (slice-size s)]
          [data (slice-data s)]
          [result (make-string size)])
     (move-memory! data result size)
+    (delete-slice s)
     result))
-
-(define make-slice
-  (foreign-lambda* slice ()
-    "leveldb::Slice *x = new leveldb::Slice();
-     C_return(x);"))
 
 (define-class <status> () ((this '())))
 (define-foreign-type status (instance "leveldb::Status" <status>))
@@ -260,8 +256,12 @@
   (let ([keystr (string->slice key)]
         [valstr (string->slice value)])
     (c-leveldb-batch-put batch keystr valstr)
+    ;; TODO: why does commenting these lines out fix key mangling issues?
+    ;; perhaps clean up slices AFTER fill-batch and batch has been written?
+    ;; - that would mean keeping track of slices created during this process somewhere
     (delete-slice keystr)
-    (delete-slice valstr)))
+    (delete-slice valstr)
+    ))
 
 (define c-leveldb-batch-del
   (foreign-lambda* void ((batch batch) (slice key))
@@ -325,24 +325,22 @@
   (foreign-lambda* bool ((iter it)) "C_return(it->Valid());"))
 
 (define c-iter-key
-  (foreign-lambda* void ((iter it) (slice ret)) "*ret = it->key();"))
+  (foreign-lambda* slice ((iter it))
+    "leveldb::Slice* key;
+     *key = it->key();
+     C_return(key);"))
 
 (define (iter-key iter)
-  (let* ([ret (make-slice)]
-         [void (c-iter-key iter ret)]
-         [result (slice->string ret)])
-    (delete-slice ret)
-    result))
+  (slice->string! (c-iter-key iter)))
 
 (define c-iter-value
-  (foreign-lambda* void ((iter it) (slice ret)) "*ret = it->value();"))
+  (foreign-lambda* slice ((iter it))
+    "leveldb::Slice* val;
+     *val = it->value();
+     C_return(val);"))
 
 (define (iter-value iter)
-  (let* ([ret (make-slice)]
-         [void (c-iter-value iter ret)]
-         [result (slice->string ret)])
-    (delete-slice ret)
-    result))
+  (slice->string! (c-iter-value iter)))
 
 (define c-iter-status
   (foreign-lambda* void ((iter it) (status s))
