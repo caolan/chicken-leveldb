@@ -24,6 +24,7 @@
              [status (make-status)]
              [void (c-leveldb-get db keystr ret status)]
              [result (stdstr->string ret)])
+        (delete-slice-data keystr)
         (delete-slice keystr)
         (delete-stdstr ret)
         (check-status status)
@@ -34,7 +35,9 @@
             [valstr (string->slice value)]
             [status (make-status)])
         (c-leveldb-put db keystr valstr status sync)
+        (delete-slice-data keystr)
         (delete-slice keystr)
+        (delete-slice-data valstr)
         (delete-slice valstr)
         (check-status status)))
 
@@ -42,6 +45,7 @@
       (let* ([keystr (string->slice key)]
              [status (make-status)]
              [void (c-leveldb-del db keystr status sync)])
+        (delete-slice-data keystr)
         (delete-slice keystr)
         (check-status status)))
 
@@ -155,6 +159,9 @@
 (define delete-slice
   (foreign-lambda* void ((slice s)) "delete s;"))
 
+(define delete-slice-data
+  (foreign-lambda* void ((slice s)) "delete s->data();"))
+
 (define (string->slice str)
   (if (not (string? str))
     (abort "string->slice expects a string as argument")
@@ -264,7 +271,9 @@
   (let ([keystr (string->slice key)]
         [valstr (string->slice value)])
     (c-leveldb-batch-put batch keystr valstr)
+    (delete-slice-data keystr)
     (delete-slice keystr)
+    (delete-slice-data valstr)
     (delete-slice valstr)))
 
 (define c-leveldb-batch-del
@@ -274,6 +283,7 @@
 (define (leveldb-batch-del batch key)
   (let ([keystr (string->slice key)])
     (c-leveldb-batch-del batch keystr)
+    (delete-slice-data keystr)
     (delete-slice keystr)))
 
 (define c-leveldb-write-batch
@@ -317,6 +327,7 @@
 (define (iter-seek! iter key)
   (let ([keyslice (string->slice key)])
     (c-iter-seek iter (string->slice key))
+    (delete-slice-data keyslice)
     (delete-slice keyslice)))
 
 (define iter-seek-first!
