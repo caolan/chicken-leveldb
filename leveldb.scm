@@ -156,11 +156,15 @@
   (foreign-lambda* void ((slice s)) "delete s;"))
 
 (define (string->slice str)
-  ((foreign-lambda* slice ((integer size) (scheme-pointer data))
-     "leveldb::Slice *x = new leveldb::Slice((const char*)data, size);
-      C_return(x);")
-   (byte-string-length str)
-   str))
+  (if (not (string? str))
+    (abort "string->slice expects a string as argument")
+    ((foreign-lambda* slice ((integer size) (scheme-pointer data))
+       "void* cpy = malloc(size);
+        memcpy(cpy, data, size);
+        leveldb::Slice *x = new leveldb::Slice((const char*)cpy, size);
+        C_return(x);")
+     (byte-string-length str)
+     str)))
 
 (define (slice->string! s)
   (let* ([size (slice-size s)]
@@ -256,12 +260,8 @@
   (let ([keystr (string->slice key)]
         [valstr (string->slice value)])
     (c-leveldb-batch-put batch keystr valstr)
-    ;; TODO: why does commenting these lines out fix key mangling issues?
-    ;; perhaps clean up slices AFTER fill-batch and batch has been written?
-    ;; - that would mean keeping track of slices created during this process somewhere
     (delete-slice keystr)
-    (delete-slice valstr)
-    ))
+    (delete-slice valstr)))
 
 (define c-leveldb-batch-del
   (foreign-lambda* void ((batch batch) (slice key))
