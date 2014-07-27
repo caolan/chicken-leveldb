@@ -1,8 +1,7 @@
 # leveldb
 
 Bindings to [LevelDB][1], a fast and lightweight key/value database library by
-Google. Provides an implementation of the
-[level](https://github.com/caolan/chicken-level) egg. Include both eggs to
+Google. Provides an implementation of the [level][2] egg. Include both eggs to
 provide the API used in these examples.
 
 ## Examples
@@ -73,7 +72,7 @@ proc returns or raises an exception.
 
 ### Synchronous Writes
 
-**Note:** this information is mostly copied from the [LevelDB docs][2]
+**Note:** this information is mostly copied from the [LevelDB docs][3]
 
 By default, each write to leveldb is asynchronous: it returns after pushing
 the write from the process into the operating system. The transfer from
@@ -96,3 +95,8 @@ considered done.
 updates may be placed in the same batch and applied together
 using a `sync: #t`. The extra cost of the synchronous write will be
 amortized across all of the writes in the batch. 
+
+
+[1]: https://code.google.com/p/leveldb/
+[2]: https://github.com/caolan/chicken-level
+[3]: http://leveldb.googlecode.com/svn/trunk/doc/index.html
