@@ -2,5 +2,5 @@
  (author "Caolan McMahon")
  (category db)
  (license "BSD")
- (needs utf8 level interfaces coops lazy-seq)
+ (needs level interfaces lazy-seq)
  (test-depends test))

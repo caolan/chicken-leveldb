@@ -5,5 +5,5 @@
 (install-extension
   'leveldb
   '("leveldb.so" "leveldb.import.so" "leveldb-static.o")
-  '((version "3.0.0")
+  '((version "3.0.1")
     (static "leveldb-static.o")))

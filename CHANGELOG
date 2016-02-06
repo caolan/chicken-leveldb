@@ -1,3 +1,5 @@
+3.0.1:
+    - fixed out of date dependencies in meta file
 3.0.0:
     - Re-written using the LevelDB C API
     - All conditions are now of type (exn leveldb)
