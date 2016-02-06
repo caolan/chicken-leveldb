@@ -1,0 +1,7 @@
+3.0.0:
+    - Re-written using the LevelDB C API
+    - All conditions are now of type (exn leveldb)
+    - Uses new level egg interface and added db-get/default support
+    - db-stream now returns key+value combinations as pairs instead of lists
+      eg, (("key" . "value")) instead of (("key" "value"))
+    - all write operations now return #<unspecified> instead of #t

@@ -20,19 +20,22 @@
           (db-put db "foo" "bar")
           (db-get db "foo")))
 
-  (let ([key (list->string '(#\f #\o #\o #\nul))]
-        [val (list->string '(#\b #\a #\r #\nul))])
+  (let ((key (list->string '(#\f #\o #\o #\nul)))
+        (val (list->string '(#\b #\a #\r #\nul))))
       (db-put db key val)
       (db-put db key val)
       (test "null bytes in keys and values" val (db-get db key)))
 
-  (test "return #f on missing key" #f (db-get db "asdf"))
+  (test-error "error on missing key" (db-get db "asdf"))
+  (test "db-get/default on missing key"
+        "ASDF"
+        (db-get/default db "asdf" "ASDF"))
 
   ;; delete previously added keys
   (db-delete db "foo")
   (db-delete db (list->string '(#\f #\o #\o #\nul)))
-  (test "attempt to get foo after deleting should return #f"
-        #f (db-get db "foo"))
+  (test-error "attempt to get foo after deleting should return #f"
+              (db-get db "foo"))
 
   (define ops '((put "1" "one")
                 (put "asdf" "asdf")
@@ -160,7 +163,10 @@
   (test-assert "not-found"
                (condition-case (db-get db "MISSING")
                  ((exn leveldb not-found) #t)
-                 ;((exn leveldb error) 123)
+                 (() #f)))
+  (test-assert "open locked db"
+               (condition-case (open-db "testdb")
+                 ((exn leveldb) #t)
                  (() #f))))
 
 (test-exit)

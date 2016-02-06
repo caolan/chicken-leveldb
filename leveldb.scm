@@ -18,19 +18,18 @@
   (implementation level-api
 
     (define (level-get db key)
-      (let ((read-options (make-read-options)))
-        (let-location ((size size_t))
-          (and-let* ((value (call-with-error-pointer
-                              (cut leveldb-get
-                                   db
-                                   read-options
-                                   key
-                                   (string-length key)
-                                   (location size)
-                                   <>))))
-            (begin0
-              (pointer->string value size)
-              (free value))))))
+      (or (get-or-false db key)
+          (abort
+            (make-composite-condition
+              (make-property-condition 'exn
+                'message "missing key"
+                'location 'db-get
+                'arguments (list db key))
+              (make-property-condition 'leveldb)
+              (make-property-condition 'not-found)))))
+
+    (define (level-get/default db key default)
+      (or (get-or-false db key) default))
 
     (define (level-put db key value #!key (sync #f))
       (let ((write-options (make-write-options sync)))
@@ -77,6 +76,21 @@
                      (if reverse
                        iterator-prev
                        iterator-next))))))
+
+(define (get-or-false db key)
+  (let ((read-options (make-read-options)))
+    (let-location ((size size_t))
+      (and-let* ((value (call-with-error-pointer
+                          (cut leveldb-get
+                               db
+                               read-options
+                               key
+                               (string-length key)
+                               (location size)
+                               <>))))
+        (begin0
+          (pointer->string value size)
+          (free value))))))
 
 (define (leveldb-condition err)
   (make-composite-condition
