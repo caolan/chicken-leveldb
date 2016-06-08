@@ -3,4 +3,4 @@
  (category db)
  (license "BSD")
  (needs level interfaces lazy-seq miscmacros)
- (test-depends test))
+ (test-depends test test-generative))
