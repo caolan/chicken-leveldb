@@ -25,7 +25,7 @@
                 'message "missing key"
                 'location 'db-get
                 'arguments (list db key))
-              (make-property-condition 'leveldb)
+              (make-property-condition 'level)
               (make-property-condition 'not-found)))))
 
     (define (level-get/default db key default)
