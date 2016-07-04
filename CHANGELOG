@@ -1,3 +1,11 @@
+4.0.0:
+    - update to new level interface (v3.0.0):
+        - remove db-stream, add db-keys, db-values and db-pairs
+        - change missing key condition to type (exn level not-found) instead of (exn leveldb not-found)
+3.0.3:
+    - add test-generative as dependency
+3.0.2:
+    - add missing miscmacros dependency
 3.0.1:
     - fixed out of date dependencies in meta file
 3.0.0:
