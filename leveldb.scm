@@ -63,14 +63,38 @@
                batch
                <>))))
 
-    (define (level-stream db #!key start end limit reverse
-                          (key #t) (value #t) fillcache)
-
+    (define (level-keys db #!key start end limit reverse fillcache)
       (let* ((read-options (make-read-options))
              (iter (make-iterator db read-options)))
         (init-stream iter start reverse)
         (make-stream iter end limit
-                     (make-stream-value key value)
+                     (lambda (k iter) k)
+                     (stream-start? start reverse)
+                     (stream-end? reverse)
+                     (if reverse
+                       iterator-prev
+                       iterator-next))))
+
+    (define (level-values db #!key start end limit reverse fillcache)
+      (let* ((read-options (make-read-options))
+             (iter (make-iterator db read-options)))
+        (init-stream iter start reverse)
+        (make-stream iter end limit
+                     (lambda (k iter)
+                       (iterator-value-string iter))
+                     (stream-start? start reverse)
+                     (stream-end? reverse)
+                     (if reverse
+                       iterator-prev
+                       iterator-next))))
+
+    (define (level-pairs db #!key start end limit reverse fillcache)
+      (let* ((read-options (make-read-options))
+             (iter (make-iterator db read-options)))
+        (init-stream iter start reverse)
+        (make-stream iter end limit
+                     (lambda (k iter)
+                       (cons k (iterator-value-string iter)))
                      (stream-start? start reverse)
                      (stream-end? reverse)
                      (if reverse

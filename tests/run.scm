@@ -50,51 +50,51 @@
 
   (test "stream from 2 limit 1"
         '(("2" . "two"))
-        (lazy-seq->list (db-stream db start: "2" limit: 1)))
+        (lazy-seq->list (db-pairs db start: "2" limit: 1)))
 
   (test "stream from 2 limit 2"
         '(("2" . "two") ("3" . "three"))
-        (lazy-seq->list (db-stream db start: "2" limit: 2)))
+        (lazy-seq->list (db-pairs db start: "2" limit: 2)))
 
   (test "stream from start limit 2"
         '(("1" . "one") ("2" . "two"))
-        (lazy-seq->list (db-stream db limit: 2)))
+        (lazy-seq->list (db-pairs db limit: 2)))
 
   (test "stream from start no limit"
         '(("1" . "one") ("2" . "two") ("3" . "three"))
-        (lazy-seq->list (db-stream db)))
+        (lazy-seq->list (db-pairs db)))
 
   (test "stream from start no limit end 2"
         '(("1" . "one") ("2" . "two"))
-        (lazy-seq->list (db-stream db end: "2")))
+        (lazy-seq->list (db-pairs db end: "2")))
 
   (test "stream from start 2 limit 2 end 2"
         '(("2" . "two"))
-        (lazy-seq->list (db-stream db start: "2" end: "2" limit: 2)))
+        (lazy-seq->list (db-pairs db start: "2" end: "2" limit: 2)))
 
   (test "stream from start 2 limit 1 end 3"
         '(("2" . "two"))
-        (lazy-seq->list (db-stream db start: "2" end: "3" limit: 1)))
+        (lazy-seq->list (db-pairs db start: "2" end: "3" limit: 1)))
 
   (test "stream keys from start 1 end 3"
         '("1" "2" "3")
         (lazy-seq->list
-          (db-stream db start: "1" end: "3" key: #t value: #f)))
+          (db-keys db start: "1" end: "3" key: #t value: #f)))
 
   (test "stream values from start 1 end 3"
         '("one" "two" "three")
         (lazy-seq->list
-          (db-stream db start: "1" end: "3" key: #f value: #t)))
+          (db-values db start: "1" end: "3" key: #f value: #t)))
 
   (test "stream reverse start 3 end 2"
         '(("3" . "three") ("2" . "two"))
         (lazy-seq->list
-          (db-stream db reverse: #t start: "3" end: "2")))
+          (db-pairs db reverse: #t start: "3" end: "2")))
 
   (test "stream reverse start 3 limit 3"
         '(("3" . "three") ("2" . "two") ("1" . "one"))
         (lazy-seq->list
-          (db-stream db reverse: #t start: "3" limit: 3)))
+          (db-pairs db reverse: #t start: "3" limit: 3)))
 
   (db-batch db '((put "four\x00zzz" "000")
                  (put "four\x00def" "456")
@@ -106,7 +106,7 @@
           ("four\x00def" . "456")
           ("four\x00abc" . "123"))
         (lazy-seq->list
-          (db-stream db reverse: #t start: "four\x00\xff" end: "four\x00")))
+          (db-pairs db reverse: #t start: "four\x00\xff" end: "four\x00")))
 
   (close-db db)
 
@@ -153,9 +153,9 @@
     (test "get value" val (db-get db key))
     (test "stream key and value"
           (list (cons key val))
-          (lazy-seq->list (db-stream db
-                                     start: key
-                                     limit: 1))))
+          (lazy-seq->list (db-pairs db
+                                    start: key
+                                    limit: 1))))
   (close-db db))
 
 (test-group "error conditions"
